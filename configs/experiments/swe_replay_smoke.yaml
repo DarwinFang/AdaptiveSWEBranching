@@ -12,3 +12,8 @@ smoke:
   task_id: Suor__funcy.207a7810.combine_file__m9nft7o1
   trials: 2
   max_steps: 1
+
+# Force trial 2 through exploit so this bounded smoke covers restore/replay.
+# The formal baseline config remains the paper's p(explore)=0.5.
+swe_replay:
+  explore_probability: 0.0

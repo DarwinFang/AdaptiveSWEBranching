@@ -22,3 +22,8 @@ The doctor command checks these identities before a live experiment. Container
 image tags from the dataset are resolved to local Docker digests and recorded per
 task/checkpoint; tags alone are never treated as immutable identities.
 
+The shared workspace cache was created by the old recoverability project and
+contains an untracked `.recov_identity.json` provenance marker. The cache is
+read-only to this project. Each copied run workspace removes that marker only
+after confirming Git does not track it, preventing old-project metadata and
+issue text from contaminating candidate patches or agent evidence.

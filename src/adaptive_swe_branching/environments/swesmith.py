@@ -110,6 +110,15 @@ class WorkspaceCache:
             self._materialise(task, template)
         resolved = self.resolve(task)
         copy_workspace(template, destination)
+        marker = destination / ".recov_identity.json"
+        if marker.exists():
+            tracked = run_git(destination, "ls-files", "--", marker.name).strip()
+            if tracked:
+                raise RuntimeError(
+                    ".recov_identity.json is tracked by the benchmark repository; "
+                    "refusing to treat it as an external cache marker"
+                )
+            marker.unlink()
         return resolved
 
     def resolve(self, task: SWESmithTask) -> SWESmithTask:
