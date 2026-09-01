@@ -93,6 +93,7 @@ class TrajectoryRecord:
     final_answer: str | None = None
     invalid_reason: str | None = None
     verifier_record_id: str | None = None
+    purpose: str = "agent_execution"
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -181,6 +182,7 @@ class ContinuationRecord:
     branch_group_id: str | None = None
     child_checkpoint_id: str | None = None
     invalid_reason: str | None = None
+    purpose: str = "counterfactual_label"
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -255,3 +257,64 @@ class VerifierRecord:
         payload = asdict(self)
         payload["outcome"] = self.outcome.value
         return payload
+
+
+@dataclass(frozen=True)
+class ScreeningPlanRecord:
+    screen_version: str
+    purpose: str
+    dataset_revision: str
+    split: str
+    sampling_seed: int
+    sampling_algorithm: str
+    eligible_pool_size: int
+    eligible_pool_sha256: str
+    ordered_tasks: tuple[dict[str, str], ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ScreeningRunRecord:
+    screen_run_id: str
+    screen_version: str
+    purpose: str
+    task_id: str
+    repository: str
+    sample_index: int
+    attempt_index: int
+    seed: int
+    trajectory_id: str
+    outcome: Outcome
+    infrastructure_invalid: bool
+    invalid_reason: str | None
+    steps: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    wall_clock_seconds: float
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["outcome"] = self.outcome.value
+        return payload
+
+
+@dataclass(frozen=True)
+class ScreeningTaskRecord:
+    screen_version: str
+    purpose: str
+    task_id: str
+    repository: str
+    sample_index: int
+    n_valid: int
+    n_success: int
+    n_failure: int
+    difficulty_class: str
+    valid_run_ids: tuple[str, ...]
+    all_attempt_run_ids: tuple[str, ...]
+    screening_invalid_reason: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

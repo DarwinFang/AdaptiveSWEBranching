@@ -13,7 +13,7 @@ from typing import Any
 
 from adaptive_swe_branching.config import config_sha256
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def stable_sha256(value: Any) -> str:
@@ -78,6 +78,10 @@ class RawStore:
         "counterfactual_group": "counterfactual_groups",
         "verifier": "verifier_records",
         "swe_replay_run": "swe_replay_runs",
+        "screening_plan": "screening_plans",
+        "screening_run": "screening_runs",
+        "screening_task": "screening_tasks",
+        "screening_cohort": "screening_cohorts",
     }
 
     def __init__(self, root: str | Path):

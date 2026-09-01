@@ -44,22 +44,44 @@ class SWESmithDataset:
         self.container_workdir = container_workdir
         self.platform = platform
         self._splits = json.loads(self.split_manifest.read_text(encoding="utf-8"))
+        raw_assignments = self._splits.get("assignments", self._splits)
+        if isinstance(raw_assignments, list):
+            self._assignments = {
+                item["instance_id"]: item["split"] for item in raw_assignments
+            }
+        else:
+            self._assignments = {
+                task_id: (
+                    value.get("split") if isinstance(value, dict) else value
+                )
+                for task_id, value in raw_assignments.items()
+            }
 
     def _split_for(self, task_id: str) -> str:
-        assignments = self._splits.get("assignments", self._splits)
-        if isinstance(assignments, list):
-            match = next(
-                (item for item in assignments if item.get("instance_id") == task_id),
-                None,
-            )
-            value = match.get("split") if match else None
-        else:
-            value = assignments.get(task_id)
-            if isinstance(value, dict):
-                value = value.get("split")
+        value = self._assignments.get(task_id)
         if not isinstance(value, str):
             raise KeyError(f"task is absent from split manifest: {task_id}")
         return value
+
+    def screening_pool(self, *, split: str) -> tuple[tuple[str, str], ...]:
+        """Return deterministic eligible task/repository pairs for screening."""
+        data_path = self.snapshot / "data"
+        dataset = ds.dataset(
+            data_path if data_path.exists() else self.snapshot,
+            format="parquet",
+            exclude_invalid_files=True,
+        )
+        table = dataset.to_table(
+            columns=["instance_id", "repo", "problem_statement"]
+        )
+        rows = table.to_pylist()
+        eligible = (
+            (str(row["instance_id"]), str(row["repo"]))
+            for row in rows
+            if self._assignments.get(str(row["instance_id"])) == split
+            and str(row.get("problem_statement") or "").strip()
+        )
+        return tuple(sorted(eligible))
 
     def load(self, task_id: str, *, base_commit: str = "") -> SWESmithTask:
         data_path = self.snapshot / "data"

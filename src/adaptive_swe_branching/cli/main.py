@@ -36,14 +36,20 @@ def main() -> None:
         "smoke-swe-replay", help="two-trial bounded faithful SWE-Replay smoke"
     )
     replay.add_argument("--config", required=True)
+    screening = subcommands.add_parser(
+        "screen-difficulty", help="run or resume independent 8-root task screening"
+    )
+    screening.add_argument("--config", required=True)
     arguments = parser.parse_args()
     config = load_config(arguments.config)
     if arguments.command == "doctor":
         report = doctor_report(config)
     elif arguments.command == "smoke-checkpoint":
         report = checkpoint_smoke(config, steps=arguments.steps)
-    else:
+    elif arguments.command == "smoke-swe-replay":
         report = swe_replay_smoke(config)
+    else:
+        report = difficulty_screen(config)
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
@@ -301,23 +307,21 @@ def swe_replay_smoke(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def difficulty_screen(config: dict[str, Any]) -> dict[str, Any]:
+    from adaptive_swe_branching.screening.runner import DifficultyScreeningRunner
+
+    doctor = doctor_report(config)
+    return DifficultyScreeningRunner(
+        config=config,
+        git_commit=_git_commit(Path.cwd()),
+        external_resources=doctor,
+    ).run()
+
+
 def _agent(config: dict[str, Any], seed: int):
     from adaptive_swe_branching.agents.openhands import OpenHandsSession
 
-    return OpenHandsSession(
-        model=config["model"],
-        base_url=config["base_url"],
-        temperature=float(config["temperature"]),
-        top_p=float(config["top_p"]),
-        max_output_tokens=int(config["max_output_tokens"]),
-        timeout_seconds=float(config["timeout_seconds"]),
-        retries=int(config["retries"]),
-        native_tool_calling=bool(config["native_tool_calling"]),
-        reasoning_effort=config.get("reasoning_effort"),
-        tools=tuple(config["tools"]),
-        max_iterations_per_step=int(config["max_iterations_per_step"]),
-        seed=seed,
-    )
+    return OpenHandsSession.from_config(config, seed=seed)
 
 
 def _git_commit(path: Path) -> str:

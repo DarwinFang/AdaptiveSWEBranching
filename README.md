@@ -15,6 +15,13 @@ permanent particle population. At a candidate executable checkpoint:
 4. the same model scores the resulting executable child states for **Judger B**;
 5. the search collapses to the chosen child and resumes as a single trajectory.
 
+If the selected suffix later falls below a configured rollback threshold, the
+controller restores the original branch-point checkpoint and then the
+highest-ranked previously generated child that has not been attempted. It does
+not sample a new child. After configurable `P <= N` attempts, another rollback
+terminates with `branch_candidates_exhausted`. The ranked list, attempts and
+every transition are persisted as append-only raw controller records.
+
 ```text
 single trajectory
       |
@@ -81,9 +88,13 @@ spread. This audit is not part of the primary rollout tree or training set.
 Its frozen protocol is in
 [`docs/CHILD_Q_AUDIT.md`](docs/CHILD_Q_AUDIT.md).
 
-Phase 4 is blocked until Oracle selective branching improves the solve-rate /
-compute frontier on a small gate. This repository currently implements Phases
-0–3 only and does not start a large rollout.
+Before Phase 4, `difficulty_screen_v1` independently runs eight valid complete
+root trajectories per sampled SWE-smith-py task. It labels only operational
+screening classes: `screen_hard` for 0--2 successes, `screen_medium` for 3--5,
+and `screen_easy` for 6--8. Screening continues without replacement until the
+retained pool has at least 300 medium, 100 easy and 100 hard tasks. These runs
+have `purpose=difficulty_screen` and are rejected by VF label construction;
+later labels and evaluation must use fresh trajectories.
 
 Compute accounting for all strategy simulations is defined in
 [`docs/MATCHED_COMPUTE.md`](docs/MATCHED_COMPUTE.md).
@@ -121,6 +132,8 @@ src/adaptive_swe_branching/
   checkpoints/                   executable checkpoint save/verified restore
   data/                          raw records and immutable experiment manifests
   branching/                     proposer, gate, ranker, temporary branching
+                                 and ranked-alternative rollback state
+  screening/                     independent 8-root task stratification
   oracle/                        same-parent Oracle A/B analysis
   training/                      offline shared-q target construction
   baselines/swe_replay/          faithful SWE-Replay reproduction
@@ -165,3 +178,13 @@ one paper-defined replay attempt):
 ```bash
 asb smoke-swe-replay --config configs/experiments/swe_replay_smoke.yaml
 ```
+
+The long-running independent task screen is resumable and protected by a
+single-process lock:
+
+```bash
+asb screen-difficulty --config configs/experiments/difficulty_screen_v1.yaml
+```
+
+Its lightweight status is written to
+`/home/fangzhaohao/asb-runs/difficulty_screen_v1/progress.json`.

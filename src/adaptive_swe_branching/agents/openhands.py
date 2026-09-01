@@ -73,6 +73,23 @@ class OpenHandsSession:
         self._final_answer: str | None = None
         self._explored_files: set[str] = set()
 
+    @classmethod
+    def from_config(cls, config: dict[str, Any], *, seed: int) -> OpenHandsSession:
+        return cls(
+            model=config["model"],
+            base_url=config["base_url"],
+            temperature=float(config["temperature"]),
+            top_p=float(config["top_p"]),
+            max_output_tokens=int(config["max_output_tokens"]),
+            timeout_seconds=float(config["timeout_seconds"]),
+            retries=int(config["retries"]),
+            native_tool_calling=bool(config["native_tool_calling"]),
+            reasoning_effort=config.get("reasoning_effort"),
+            tools=tuple(config["tools"]),
+            max_iterations_per_step=int(config["max_iterations_per_step"]),
+            seed=seed,
+        )
+
     @property
     def fingerprint(self) -> str:
         return stable_sha256(

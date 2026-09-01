@@ -16,6 +16,10 @@ class ContinuationEvidence:
     trajectory: TrajectoryRecord
 
     def post_parent_steps(self) -> tuple[StepRecord, ...]:
+        if self.trajectory.purpose == "difficulty_screen":
+            raise ValueError(
+                "difficulty-screen trajectories cannot become VF supervision"
+            )
         if self.record.trajectory_id != self.trajectory.trajectory_id:
             raise ValueError("continuation and trajectory identities differ")
         if (
@@ -157,6 +161,15 @@ def _require_same_parent(
     parent_checkpoint_id: str,
     continuations: tuple[ContinuationRecord, ...],
 ) -> None:
+    screening = [
+        item.continuation_id
+        for item in continuations
+        if item.purpose == "difficulty_screen"
+    ]
+    if screening:
+        raise ValueError(
+            f"difficulty-screen records cannot become VF supervision: {screening}"
+        )
     mismatched = [
         item.continuation_id
         for item in continuations

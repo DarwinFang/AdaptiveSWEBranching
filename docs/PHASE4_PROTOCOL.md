@@ -54,6 +54,16 @@ do not reveal an exact empirical `q` for any individual child.
 
 ## Independent task screening
 
+The active clean screen is `difficulty_screen_v1`. It requests exactly eight
+valid fresh root trajectories per task and classifies 0--2 successes as
+`screen_hard`, 3--5 as `screen_medium`, and 6--8 as `screen_easy`. Fixed-seed
+sampling proceeds without replacement until all quotas are met: 300 medium,
+100 easy and 100 hard. Infrastructure-invalid attempts are retained and
+replaced; they never become ordinary failures. These trajectories are selection
+data only and cannot become shared-q labels or evaluation samples.
+
+The older six-run screen below remains historical pilot evidence only.
+
 The existing screen at
 `/home/fangzhaohao/recov-runs/oracle_branchability_root_screen_v1` used fresh
 root trajectories, six requested runs per task, and a medium criterion of two

@@ -1,0 +1,33 @@
+include:
+  - ../agent/qwen3_coder_30b_openhands.yaml
+  - ../benchmark/swesmith_py.yaml
+
+experiment:
+  name: difficulty_screen_v1
+  output_dir: /home/fangzhaohao/asb-runs/difficulty_screen_v1
+  root_seed: 20260901
+  purpose: difficulty_screen
+  immutable_manifest_required: true
+
+screening:
+  screen_version: difficulty_screen_v1
+  sampling: fixed_seed_without_replacement
+  valid_runs_per_task: 8
+  maximum_total_attempts_per_task: 12
+  invalid_policy: retain_raw_retry_new_deterministic_seed
+  safety_cap_steps: 60
+  difficulty_classes:
+    screen_hard:
+      successes: [0, 1, 2]
+    screen_medium:
+      successes: [3, 4, 5]
+    screen_easy:
+      successes: [6, 7, 8]
+  quotas:
+    screen_medium: 300
+    screen_easy: 100
+    screen_hard: 100
+  preserve_all_screened_tasks: true
+  reuse_for_vf_labels: false
+  reuse_for_counterfactual_continuations: false
+  reuse_for_online_evaluation: false
