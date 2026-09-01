@@ -55,6 +55,24 @@ def difficulty_class(successes: int, *, valid_runs: int = 8) -> str:
     return SCREEN_EASY
 
 
+def resolved_difficulty_class(
+    successes: int,
+    *,
+    observed_valid_runs: int,
+    target_valid_runs: int = 8,
+) -> tuple[str | None, tuple[int, int]]:
+    """Resolve an 8-run class once every remaining outcome gives one class."""
+    if not 0 <= successes <= observed_valid_runs <= target_valid_runs:
+        raise ValueError("success/run counts must satisfy 0 <= k <= n <= target")
+    remaining = target_valid_runs - observed_valid_runs
+    possible = (successes, successes + remaining)
+    classes = {
+        difficulty_class(candidate, valid_runs=target_valid_runs)
+        for candidate in range(possible[0], possible[1] + 1)
+    }
+    return (classes.pop() if len(classes) == 1 else None), possible
+
+
 def quotas_satisfied(counts: Counter[str], quotas: dict[str, int]) -> bool:
     return all(counts[name] >= target for name, target in quotas.items())
 
@@ -83,7 +101,7 @@ def selected_cohort(
 
 
 class DifficultyScreeningRunner:
-    """Independent 8-valid-root-run task stratification job."""
+    """Independent task stratification under the frozen 8-run rule."""
 
     def __init__(
         self,
@@ -289,7 +307,15 @@ class DifficultyScreeningRunner:
         new_records: list[ScreeningRunRecord] = []
         for attempt_index in range(self.maximum_attempts):
             valid = [item for item in accumulated if not item["infrastructure_invalid"]]
-            if len(valid) >= self.target_valid:
+            successes = sum(
+                item["outcome"] == Outcome.SOLVED.value for item in valid
+            )
+            resolved_class, _ = resolved_difficulty_class(
+                successes,
+                observed_valid_runs=len(valid),
+                target_valid_runs=self.target_valid,
+            )
+            if resolved_class is not None:
                 break
             if any(int(item["attempt_index"]) == attempt_index for item in accumulated):
                 continue
@@ -307,8 +333,14 @@ class DifficultyScreeningRunner:
 
         valid = [item for item in accumulated if not item["infrastructure_invalid"]]
         all_ids = tuple(item["screen_run_id"] for item in accumulated)
-        valid_ids = tuple(item["screen_run_id"] for item in valid[: self.target_valid])
-        if len(valid) < self.target_valid:
+        valid_ids = tuple(item["screen_run_id"] for item in valid)
+        successes = sum(item["outcome"] == Outcome.SOLVED.value for item in valid)
+        resolved_class, possible = resolved_difficulty_class(
+            successes,
+            observed_valid_runs=len(valid),
+            target_valid_runs=self.target_valid,
+        )
+        if resolved_class is None:
             summary = ScreeningTaskRecord(
                 screen_version=self.screen_version,
                 purpose=PURPOSE,
@@ -325,25 +357,29 @@ class DifficultyScreeningRunner:
                 difficulty_class=SCREEN_INVALID,
                 valid_run_ids=valid_ids,
                 all_attempt_run_ids=all_ids,
+                possible_final_success_min=possible[0],
+                possible_final_success_max=possible[1],
                 screening_invalid_reason=(
-                    f"only {len(valid)} valid runs after {len(accumulated)} attempts"
+                    f"class unresolved after {len(valid)} valid runs and "
+                    f"{len(accumulated)} attempts"
                 ),
             )
             return summary, new_records
-        accepted = valid[: self.target_valid]
-        successes = sum(item["outcome"] == Outcome.SOLVED.value for item in accepted)
         summary = ScreeningTaskRecord(
             screen_version=self.screen_version,
             purpose=PURPOSE,
             task_id=task_id,
             repository=repository,
             sample_index=sample_index,
-            n_valid=self.target_valid,
+            n_valid=len(valid),
             n_success=successes,
-            n_failure=self.target_valid - successes,
-            difficulty_class=difficulty_class(successes),
+            n_failure=len(valid) - successes,
+            difficulty_class=resolved_class,
             valid_run_ids=valid_ids,
             all_attempt_run_ids=all_ids,
+            early_stopped=len(valid) < self.target_valid,
+            possible_final_success_min=possible[0],
+            possible_final_success_max=possible[1],
         )
         return summary, new_records
 

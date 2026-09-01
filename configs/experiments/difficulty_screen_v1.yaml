@@ -13,6 +13,7 @@ screening:
   screen_version: difficulty_screen_v1
   sampling: fixed_seed_without_replacement
   valid_runs_per_task: 8
+  early_stop_when_class_mathematically_resolved: true
   maximum_total_attempts_per_task: 12
   invalid_policy: retain_raw_retry_new_deterministic_seed
   safety_cap_steps: 60

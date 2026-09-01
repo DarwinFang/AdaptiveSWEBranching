@@ -10,6 +10,7 @@ from adaptive_swe_branching.screening.runner import (
     SCREEN_MEDIUM,
     difficulty_class,
     quotas_satisfied,
+    resolved_difficulty_class,
     selected_cohort,
 )
 
@@ -27,6 +28,27 @@ from adaptive_swe_branching.screening.runner import (
 )
 def test_frozen_eight_run_screening_boundaries(successes, expected) -> None:
     assert difficulty_class(successes) == expected
+
+
+@pytest.mark.parametrize(
+    ("successes", "observed", "expected", "possible"),
+    [
+        (0, 6, SCREEN_HARD, (0, 2)),
+        (3, 6, SCREEN_MEDIUM, (3, 5)),
+        (6, 6, SCREEN_EASY, (6, 8)),
+        (2, 7, None, (2, 3)),
+        (5, 7, None, (5, 6)),
+        (2, 8, SCREEN_HARD, (2, 2)),
+        (5, 8, SCREEN_MEDIUM, (5, 5)),
+        (8, 8, SCREEN_EASY, (8, 8)),
+    ],
+)
+def test_screening_stops_only_when_final_class_is_mathematically_fixed(
+    successes, observed, expected, possible
+) -> None:
+    assert resolved_difficulty_class(
+        successes, observed_valid_runs=observed
+    ) == (expected, possible)
 
 
 def test_all_three_quotas_must_be_reached() -> None:

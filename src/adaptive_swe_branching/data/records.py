@@ -314,6 +314,10 @@ class ScreeningTaskRecord:
     difficulty_class: str
     valid_run_ids: tuple[str, ...]
     all_attempt_run_ids: tuple[str, ...]
+    nominal_valid_run_target: int = 8
+    early_stopped: bool = False
+    possible_final_success_min: int | None = None
+    possible_final_success_max: int | None = None
     screening_invalid_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
