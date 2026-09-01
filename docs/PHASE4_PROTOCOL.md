@@ -54,13 +54,19 @@ do not reveal an exact empirical `q` for any individual child.
 
 ## Independent task screening
 
-The active clean screen is `difficulty_screen_v1`. It requests exactly eight
-valid fresh root trajectories per task and classifies 0--2 successes as
+The active screen is `difficulty_screen_v2_20step`. It measures success within
+20 ordinary Agent steps, budgets up to eight valid root outcomes per task and
+classifies 0--2 successes as
 `screen_hard`, 3--5 as `screen_medium`, and 6--8 as `screen_easy`. Fixed-seed
-sampling proceeds without replacement until all quotas are met: 300 medium,
+sampling prioritizes the earlier 60+60 tasks, then proceeds without replacement
+until all quotas are met: 300 medium,
 100 easy and 100 hard. Infrastructure-invalid attempts are retained and
-replaced; they never become ordinary failures. These trajectories are selection
-data only and cannot become shared-q labels or evaluation samples.
+replaced; they never become ordinary failures. A task stops as soon as all
+remaining outcomes imply the same class. The earlier task files contribute
+their compatible source-run `k/m` counts, while fresh runs supply the missing
+outcomes. These trajectories are selection data only and cannot become shared-q
+labels or evaluation samples. Later continuation value remains a separate
+60-step quantity; a `q20` screening class is never reported as `q60`.
 
 The older six-run screen below remains historical pilot evidence only.
 

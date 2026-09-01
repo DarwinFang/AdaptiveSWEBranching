@@ -9,6 +9,7 @@ from adaptive_swe_branching.screening.runner import (
     SCREEN_HARD,
     SCREEN_MEDIUM,
     difficulty_class,
+    order_screening_pool,
     quotas_satisfied,
     resolved_difficulty_class,
     selected_cohort,
@@ -49,6 +50,16 @@ def test_screening_stops_only_when_final_class_is_mathematically_fixed(
     assert resolved_difficulty_class(
         successes, observed_valid_runs=observed
     ) == (expected, possible)
+
+
+def test_compatible_imported_tasks_are_screened_first() -> None:
+    pool = [("fresh", "repo/f"), ("old-hard", "repo/h"), ("old-medium", "repo/m")]
+    imported = {
+        "old-medium": {"successes": 1, "valid_runs": 3},
+        "old-hard": {"successes": 0, "valid_runs": 3},
+    }
+    ordered = order_screening_pool(pool, root_seed=7, imported=imported)
+    assert [task_id for task_id, _ in ordered[:2]] == ["old-medium", "old-hard"]
 
 
 def test_all_three_quotas_must_be_reached() -> None:

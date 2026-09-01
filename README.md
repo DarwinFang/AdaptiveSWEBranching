@@ -88,7 +88,7 @@ spread. This audit is not part of the primary rollout tree or training set.
 Its frozen protocol is in
 [`docs/CHILD_Q_AUDIT.md`](docs/CHILD_Q_AUDIT.md).
 
-Before Phase 4, `difficulty_screen_v1` independently budgets up to eight valid
+Before Phase 4, the screening stage independently budgets up to eight valid
 complete root trajectories per sampled SWE-smith-py task. It stops early only
 when every possible outcome of the remaining runs gives the same frozen class,
 and records the observed count and possible final-success interval. It labels only operational
@@ -97,6 +97,12 @@ and `screen_easy` for 6--8. Screening continues without replacement until the
 retained pool has at least 300 medium, 100 easy and 100 hard tasks. These runs
 have `purpose=difficulty_screen` and are rejected by VF label construction;
 later labels and evaluation must use fresh trajectories.
+
+The current screening definition is success within 20 Agent steps (`q20`). A
+compact `k/m` index from the earlier 60+60 task runs seeds the first three
+outcomes when available; new clean runs complete the classification. This
+screening-only `q20` must not be confused with the 60-step state value used by
+later continuation experiments.
 
 Compute accounting for all strategy simulations is defined in
 [`docs/MATCHED_COMPUTE.md`](docs/MATCHED_COMPUTE.md).

@@ -318,6 +318,9 @@ class ScreeningTaskRecord:
     early_stopped: bool = False
     possible_final_success_min: int | None = None
     possible_final_success_max: int | None = None
+    imported_valid_runs: int = 0
+    imported_successes: int = 0
+    evidence_source: str = "fresh"
     screening_invalid_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:

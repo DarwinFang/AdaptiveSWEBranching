@@ -108,14 +108,20 @@ parent before selecting an already-generated untried child; it never resamples.
 
 ## Independent difficulty screening
 
-`ScreeningPlanRecord` freezes the shuffled-without-replacement SWE-smith-py task
-order, seed, eligible-pool hash and repository mapping. `ScreeningRunRecord`
-links one fresh root trajectory and records its seed, terminal outcome, invalid
-status and measured costs. `ScreeningTaskRecord` is written only after eight
-valid runs or explicit infrastructure invalidation and stores the operational
-`screen_hard`, `screen_medium` or `screen_easy` class. A deterministic cohort is
+`ScreeningPlanRecord` freezes the priority-then-shuffled SWE-smith-py task
+order, seed, eligible-pool hash, repository mapping and any imported 20-step
+`k/m` counts. `ScreeningRunRecord` links one fresh root trajectory and records
+its seed, terminal outcome, invalid status and measured costs.
+`ScreeningTaskRecord` is written when the frozen eight-run class is
+mathematically fixed, after eight valid outcomes, or after explicit
+infrastructure invalidation. It stores the operational `screen_hard`,
+`screen_medium` or `screen_easy` class plus imported/fresh evidence counts. A deterministic cohort is
 frozen only after all three quotas are reached. Every linked trajectory has
 `purpose=difficulty_screen`; training label code rejects that purpose.
+
+For day-to-day inspection, `screening_results.csv` intentionally exposes only
+`task_id,k,m,class,source`. The richer raw records exist for provenance, not as
+extra screening targets.
 
 ### CounterfactualGroupRecord (generic, not Phase 4)
 

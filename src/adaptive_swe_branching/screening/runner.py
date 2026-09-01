@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import fcntl
 import json
 import random
@@ -100,6 +101,18 @@ def selected_cohort(
     }
 
 
+def order_screening_pool(
+    pool: list[tuple[str, str]],
+    *,
+    root_seed: int,
+    imported: dict[str, dict[str, Any]],
+) -> list[tuple[str, str]]:
+    """Put compatible legacy tasks first, retaining random order otherwise."""
+    random.Random(root_seed).shuffle(pool)
+    rank = {task_id: index for index, task_id in enumerate(imported)}
+    return sorted(pool, key=lambda item: (rank.get(item[0], len(rank)),))
+
+
 class DifficultyScreeningRunner:
     """Independent task stratification under the frozen 8-run rule."""
 
@@ -132,6 +145,7 @@ class DifficultyScreeningRunner:
             SCREEN_EASY: int(self.screen["quotas"][SCREEN_EASY]),
             SCREEN_HARD: int(self.screen["quotas"][SCREEN_HARD]),
         }
+        self.imported = self._load_imported_counts()
         self.dataset = SWESmithDataset(
             snapshot=Path(self.benchmark["dataset_path"]),
             revision=self.benchmark["version"],
@@ -178,12 +192,16 @@ class DifficultyScreeningRunner:
                     repository=item["repository"],
                     sample_index=int(item["sample_index"]),
                     prior_runs=[run for run in runs if run["task_id"] == task_id],
+                    imported_successes=int(item.get("imported_successes", 0)),
+                    imported_valid_runs=int(item.get("imported_valid_runs", 0)),
+                    evidence_source=str(item.get("evidence_source", "fresh")),
                 )
                 summaries.append(summary.to_dict())
                 runs.extend(run.to_dict() for run in new_runs)
                 self.raw.put("screening_task", task_id, summary)
                 self.current_task = None
                 self._write_progress(summaries, runs)
+                self._write_screening_results(summaries)
                 counts = Counter(
                     record["difficulty_class"]
                     for record in summaries
@@ -218,6 +236,19 @@ class DifficultyScreeningRunner:
             self._write_progress(summaries, runs, complete=True)
             return self._progress_payload(summaries, runs, complete=True)
 
+    def _load_imported_counts(self) -> dict[str, dict[str, Any]]:
+        path_value = self.screen.get("initial_counts_path")
+        if not path_value:
+            return {}
+        payload = json.loads(Path(path_value).expanduser().read_text(encoding="utf-8"))
+        expected_definition = "ordinary root Agent outcome within at most 20 steps"
+        if payload.get("definition") != expected_definition:
+            raise ValueError("imported screening counts use a different definition")
+        imported = {row["task_id"]: row for row in payload["tasks"]}
+        if len(imported) != len(payload["tasks"]):
+            raise ValueError("imported screening task IDs are not unique")
+        return imported
+
     def _initialise_manifest(self) -> None:
         manifest_path = self.raw.root / "manifest.json"
         if manifest_path.exists():
@@ -249,12 +280,23 @@ class DifficultyScreeningRunner:
             pool = list(
                 self.dataset.screening_pool(split=str(self.benchmark["split"]))
             )
-            random.Random(self.root_seed).shuffle(pool)
+            pool = order_screening_pool(
+                pool, root_seed=self.root_seed, imported=self.imported
+            )
             ordered = tuple(
                 {
                     "task_id": task_id,
                     "repository": repository,
                     "sample_index": str(index),
+                    "imported_successes": str(
+                        self.imported.get(task_id, {}).get("successes", 0)
+                    ),
+                    "imported_valid_runs": str(
+                        self.imported.get(task_id, {}).get("valid_runs", 0)
+                    ),
+                    "evidence_source": (
+                        "legacy_source20+fresh" if task_id in self.imported else "fresh"
+                    ),
                 }
                 for index, (task_id, repository) in enumerate(pool)
             )
@@ -264,7 +306,9 @@ class DifficultyScreeningRunner:
                 dataset_revision=str(self.benchmark["version"]),
                 split=str(self.benchmark["split"]),
                 sampling_seed=self.root_seed,
-                sampling_algorithm="python_random_shuffle_of_sorted_eligible_task_ids",
+                sampling_algorithm=(
+                    "compatible_import_order_then_python_random_shuffle_of_remaining"
+                ),
                 eligible_pool_size=len(ordered),
                 eligible_pool_sha256=stable_sha256(ordered),
                 ordered_tasks=ordered,
@@ -279,6 +323,9 @@ class DifficultyScreeningRunner:
         repository: str,
         sample_index: int,
         prior_runs: list[dict[str, Any]],
+        imported_successes: int,
+        imported_valid_runs: int,
+        evidence_source: str,
     ) -> tuple[ScreeningTaskRecord, list[ScreeningRunRecord]]:
         try:
             task = self.cache.resolve(self.dataset.load(task_id))
@@ -307,12 +354,12 @@ class DifficultyScreeningRunner:
         new_records: list[ScreeningRunRecord] = []
         for attempt_index in range(self.maximum_attempts):
             valid = [item for item in accumulated if not item["infrastructure_invalid"]]
-            successes = sum(
+            successes = imported_successes + sum(
                 item["outcome"] == Outcome.SOLVED.value for item in valid
             )
             resolved_class, _ = resolved_difficulty_class(
                 successes,
-                observed_valid_runs=len(valid),
+                observed_valid_runs=imported_valid_runs + len(valid),
                 target_valid_runs=self.target_valid,
             )
             if resolved_class is not None:
@@ -334,10 +381,13 @@ class DifficultyScreeningRunner:
         valid = [item for item in accumulated if not item["infrastructure_invalid"]]
         all_ids = tuple(item["screen_run_id"] for item in accumulated)
         valid_ids = tuple(item["screen_run_id"] for item in valid)
-        successes = sum(item["outcome"] == Outcome.SOLVED.value for item in valid)
+        successes = imported_successes + sum(
+            item["outcome"] == Outcome.SOLVED.value for item in valid
+        )
+        total_valid = imported_valid_runs + len(valid)
         resolved_class, possible = resolved_difficulty_class(
             successes,
-            observed_valid_runs=len(valid),
+            observed_valid_runs=total_valid,
             target_valid_runs=self.target_valid,
         )
         if resolved_class is None:
@@ -347,18 +397,19 @@ class DifficultyScreeningRunner:
                 task_id=task_id,
                 repository=repository,
                 sample_index=sample_index,
-                n_valid=len(valid),
+                n_valid=total_valid,
                 n_success=sum(
                     item["outcome"] == Outcome.SOLVED.value for item in valid
                 ),
-                n_failure=sum(
-                    item["outcome"] == Outcome.UNSOLVED.value for item in valid
-                ),
+                n_failure=total_valid - successes,
                 difficulty_class=SCREEN_INVALID,
                 valid_run_ids=valid_ids,
                 all_attempt_run_ids=all_ids,
                 possible_final_success_min=possible[0],
                 possible_final_success_max=possible[1],
+                imported_valid_runs=imported_valid_runs,
+                imported_successes=imported_successes,
+                evidence_source=evidence_source,
                 screening_invalid_reason=(
                     f"class unresolved after {len(valid)} valid runs and "
                     f"{len(accumulated)} attempts"
@@ -371,15 +422,18 @@ class DifficultyScreeningRunner:
             task_id=task_id,
             repository=repository,
             sample_index=sample_index,
-            n_valid=len(valid),
+            n_valid=total_valid,
             n_success=successes,
-            n_failure=len(valid) - successes,
+            n_failure=total_valid - successes,
             difficulty_class=resolved_class,
             valid_run_ids=valid_ids,
             all_attempt_run_ids=all_ids,
-            early_stopped=len(valid) < self.target_valid,
+            early_stopped=total_valid < self.target_valid,
             possible_final_success_min=possible[0],
             possible_final_success_max=possible[1],
+            imported_valid_runs=imported_valid_runs,
+            imported_successes=imported_successes,
+            evidence_source=evidence_source,
         )
         return summary, new_records
 
@@ -580,6 +634,27 @@ class DifficultyScreeningRunner:
             self.output / "repository_distribution.json",
             payload["repository_distribution"],
         )
+
+    def _write_screening_results(self, summaries: list[dict[str, Any]]) -> None:
+        path = self.output / "screening_results.csv"
+        temporary = path.with_suffix(".csv.tmp")
+        with temporary.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=["task_id", "k", "m", "class", "source"],
+            )
+            writer.writeheader()
+            for item in sorted(summaries, key=lambda row: row["sample_index"]):
+                writer.writerow(
+                    {
+                        "task_id": item["task_id"],
+                        "k": item["n_success"],
+                        "m": item["n_valid"],
+                        "class": item["difficulty_class"],
+                        "source": item.get("evidence_source", "fresh"),
+                    }
+                )
+        temporary.replace(path)
 
     def _progress_payload(
         self,

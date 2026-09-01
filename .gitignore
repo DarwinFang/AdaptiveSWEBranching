@@ -15,17 +15,17 @@ credentials.json
 secrets.*
 
 # Expensive experiment state must remain outside source control
-outputs/
-runs/
-asb-runs/
-raw/
-data/
-models/
-checkpoints/
-workspaces/
-scratch/
-wandb/
-mlruns/
+/outputs/
+/runs/
+/asb-runs/
+/raw/
+/data/
+/models/
+/checkpoints/
+/workspaces/
+/scratch/
+/wandb/
+/mlruns/
 
 # Model, dataset, checkpoint, and rollout artifacts
 *.parquet
