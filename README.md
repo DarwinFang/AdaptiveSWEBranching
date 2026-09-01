@@ -60,6 +60,9 @@ Phase 4 is blocked until Oracle selective branching improves the solve-rate /
 compute frontier on a small gate. This repository currently implements Phases
 0–3 only and does not start a large rollout.
 
+Compute accounting for all strategy simulations is defined in
+[`docs/MATCHED_COMPUTE.md`](docs/MATCHED_COMPUTE.md).
+
 ## SWE-Replay baseline
 
 `adaptive_swe_branching.baselines.swe_replay` reproduces the complete algorithm

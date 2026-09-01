@@ -23,6 +23,24 @@ choices. Section and equation references below point to the v2 source.
 
 The code comments `Paper Algorithm 1 line …` map these operations to functions.
 
+## Algorithm-to-code map
+
+| Paper operation | Implementation |
+|---|---|
+| Algorithm 1 trial loop and explore/exploit coin | `SWEReplayRunner.run` |
+| Regression-clean replay pool | `CriticalStepSelector.candidates` |
+| Eq. 1 and Eq. 2 sampling | `CriticalStepSelector.select` |
+| Non-repository mutation test | `restore_plan` |
+| Fresh trajectory and pre-step archive | `OpenHandsReplayBackend.explore` / `_continue` |
+| Diff reconstruction or prefix action replay | `OpenHandsReplayBackend.exploit` / `_replay_actions` |
+| Replacement selected step and suffix | restored pre-step `AgentSession` followed by `_continue` |
+| Candidate regression filtering and majority | `final_candidate` |
+| Exact SWE-smith regression/result check | `SWESmithVerifier.verify` |
+
+The bounded live smoke forces trial two to exploit solely to cover the complete
+restore path. The formal baseline configuration retains the paper's 0.5 explore
+probability.
+
 ## Underspecified details and frozen interpretations
 
 ### 1. What counts as an explored repository file?
@@ -128,4 +146,3 @@ be applied offline.
 branch suffix generation, archive update, and final candidate processing.
 `SWEReplayCriticalStepProposer` only exposes candidate steps. The adaptive method
 must still ask Judger A whether to spend branching compute.
-

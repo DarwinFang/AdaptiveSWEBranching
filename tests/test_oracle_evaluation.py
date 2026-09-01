@@ -5,6 +5,12 @@ from adaptive_swe_branching.evaluation.matched_compute import (
     MatchedComputeEvaluator,
     StrategyTrace,
 )
+from adaptive_swe_branching.evaluation.simulate import (
+    best_of_n,
+    oracle_a_b,
+    random_branching,
+    single_chain,
+)
 from adaptive_swe_branching.oracle.judgers import OracleA, OracleB
 from adaptive_swe_branching.oracle.records import (
     ChildFutures,
@@ -62,3 +68,30 @@ def test_matched_compute_requires_same_tasks_and_uses_first_solve_cost() -> None
     points = MatchedComputeEvaluator().curve(traces, cost_axis="steps", budgets=(4, 8))
     oracle = [point for point in points if point.strategy == "oracle"]
     assert [point.solve_rate for point in oracle] == [0.5, 1.0]
+
+
+def test_strategy_simulators_charge_all_purchased_compute() -> None:
+    samples = (sample("one", False, 10), sample("two", True, 20))
+    assert single_chain("t", samples[0]).total_cost.total_tokens == 10
+    best = best_of_n("t", samples, n=2)
+    assert best.outcome == Outcome.SOLVED
+    assert best.total_cost.total_tokens == 30
+    experiment = CounterfactualExperiment(
+        task_id="t",
+        parent_checkpoint_id="p",
+        no_branch_samples=samples,
+        children=(
+            ChildFutures("good", Cost(input_tokens=3), (sample("g", True, 5),)),
+            ChildFutures("bad", Cost(input_tokens=4), (sample("b", False, 5),)),
+        ),
+    )
+    random_trace = random_branching(experiment, seed=1)
+    assert random_trace.total_cost.total_tokens == 12
+    oracle_trace = oracle_a_b(
+        experiment,
+        utility=SuccessOnlyUtility(),
+        headroom_threshold=-1.0,
+        evaluation_seed=1,
+    )
+    assert oracle_trace.outcome == Outcome.SOLVED
+    assert oracle_trace.total_cost.total_tokens == 12
