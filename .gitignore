@@ -4,7 +4,45 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 .venv/
-outputs/
-*.log
-.DS_Store
 
+# Local credentials and machine-specific overrides
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.*
+
+# Expensive experiment state must remain outside source control
+outputs/
+runs/
+asb-runs/
+raw/
+data/
+models/
+checkpoints/
+workspaces/
+scratch/
+wandb/
+mlruns/
+
+# Model, dataset, checkpoint, and rollout artifacts
+*.parquet
+*.arrow
+*.jsonl
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# Runtime/build artifacts
+*.log
+*.pid
+.coverage
+htmlcov/
+build/
+dist/
+.DS_Store
