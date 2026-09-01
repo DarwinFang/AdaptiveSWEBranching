@@ -1,0 +1,153 @@
+include:
+  - ../agent/qwen3_coder_30b_openhands.yaml
+  - ../benchmark/swesmith_py.yaml
+  - ../baselines/swe_replay.yaml
+
+experiment:
+  name: phase4_oracle_pilot_v1
+  method_version: single_layer_shared_q_v1
+  status: planned_not_launched
+  output_dir: /home/fangzhaohao/asb-runs/phase4_oracle_pilot_v1
+  root_seed: 20260901
+  immutable_manifest_required: true
+
+difficulty_screen:
+  independent_from_label_rollouts: true
+  reuse_screen_trajectories: false
+  existing_run_dir: /home/fangzhaohao/recov-runs/oracle_branchability_root_screen_v1
+  existing_manifest: /home/fangzhaohao/recov-runs/oracle_branchability_root_screen_v1/manifest.json
+  existing_code_commit: a7d30e433fd372d2159cad3db08a5b56ebb6231b
+  runs_per_task: 6
+  medium_success_counts: [2, 3, 4]
+  medium_q_range_inclusive: [0.2, 0.8]
+  require_complete_screen_runs: true
+  audit:
+    screened_tasks: 40
+    root_trajectories_present: 196
+    tasks_with_all_6_runs: 28
+    incomplete_tasks: 12
+    eligible_medium_tasks: 5
+    audited_at: "2026-09-01"
+  eligible_task_ids:
+    - PyCQA__flake8.cf1542ce.combine_file__a0r77ily
+    - andialbrecht__sqlparse.e57923b3.func_basic__2z5qpz31
+    - benoitc__gunicorn.bacbf8aa.lm_rewrite__qo8ncrou
+    - borntyping__python-colorlog.dfa10f59.combine_file__zfevw67p
+    - burnash__gspread.a8be3b96.func_pm_remove_wrapper__8fiiuog5
+  pilot_minimum_tasks: 12
+  pilot_target_tasks: 12
+  pilot_maximum_tasks: 20
+  action_if_below_minimum: extend_with_fresh_complete_root_runs
+  launch_blocked_until_minimum: true
+
+source_trajectory:
+  fresh_runs_per_selected_task: 1
+  reuse_difficulty_screen_runs: false
+  termination: natural_or_safety_cap
+  safety_cap_steps: 60
+
+parent_candidates:
+  requested_per_task: 4
+  nonterminal_only: true
+  candidates:
+    random:
+      count: 3
+      selection: stratified_uniform_without_replacement
+      strata_by_eligible_checkpoint_rank:
+        - early_third
+        - middle_third
+        - late_third
+      candidate_source: random
+    swe_replay:
+      count: 1
+      selector: faithful_critical_step_selector
+      candidate_source: swe_replay
+  deduplicate_absolute_steps: true
+  duplicate_replacement: random_from_same_stratum_then_any_eligible_nonterminal
+  shortfall_policy: record_and_exclude_parent_shortfall_from_balanced_analysis
+
+label_rollout:
+  full_continuations_per_parent_requested: 8
+  continuation_k_is_variable_in_schema: true
+  restore_exact_same_parent: true
+  isolated_workspaces: true
+  full_post_parent_trajectory_required: true
+  save_executable_prefix_checkpoints_at_steps: [1, 2, 4, 6]
+  termination: natural_or_safety_cap
+  safety_cap_steps: 60
+  nested_child_downstream_rollouts: false
+  separate_no_branch_rollouts: false
+  invalid_outcome_policy: retain_raw_exclude_from_valid_k
+  minimum_valid_k_for_primary_analysis: null  # freeze before launch
+
+shared_success_probability_model:
+  output: q_state
+  meaning: probability_of_eventual_success_under_frozen_agent_protocol
+  training_objective: binomial_negative_log_likelihood
+  evidence_weighting: one_unit_per_observed_bernoulli_future
+  parent_examples:
+    input: parent_executable_checkpoint
+    successes: successful_valid_continuations
+    trials: valid_continuations
+  prefix_examples:
+    input: saved_executable_prefix_checkpoint
+    prefix_steps: [1, 2, 4, 6]
+    successes: terminal_success_of_its_one_full_continuation
+    trials: 1
+  uses_cost_as_target: false
+  pairwise_head: false
+  separate_a_b_models: false
+
+inference_roles:
+  judger_a:
+    input: parent_executable_checkpoint
+    score: 4*q_parent*(1-q_parent)
+  judger_b:
+    input: each_generated_child_executable_checkpoint
+    selection: argmax_q_child
+
+oracle_analysis:
+  judger_a_threshold_sweep: all_unique_observed_scores_plus_endpoints
+  diagnostic_threshold: 0.75
+  learned_threshold_selection_split: validation
+  judger_b: realized_terminal_outcome_upper_bound
+  judger_b_is_not_exact_child_q: true
+
+online_simulation:
+  primary_branch_count: 4
+  secondary_branch_count: 2
+  prefix_steps: [1, 2, 4, 6]
+  strategies:
+    - single_chain
+    - best_of_n
+    - random_branching
+    - faithful_swe_replay
+    - oracle_a_oracle_b
+  compute:
+    primary_axis: total_tokens
+    secondary_axes: [model_calls, steps, wall_clock_seconds]
+    normalized_budgets: [1.0, 1.5, 2.0, 4.0]
+    reference_1x: one_ordinary_single_chain_protocol
+
+planned_scale:
+  at_12_tasks:
+    source_trajectories: 12
+    parent_checkpoints: 48
+    full_continuations: 384
+    grouped_parent_q_targets_max: 48
+    prefix_bernoulli_q_targets_max_all_4_depths: 1536
+    shared_q_targets_max_total: 1584
+  at_20_tasks:
+    source_trajectories: 20
+    parent_checkpoints: 80
+    full_continuations: 640
+    grouped_parent_q_targets_max: 80
+    prefix_bernoulli_q_targets_max_all_4_depths: 2560
+    shared_q_targets_max_total: 2640
+
+launch_gates:
+  - at_least_12_independently_screened_medium_tasks
+  - freeze_minimum_valid_k_for_primary_analysis
+  - review_parent_shortfall_and_deduplication_policy
+  - run_bounded_checkpoint_restore_and_verifier_smoke
+  - create_immutable_resolved_manifest

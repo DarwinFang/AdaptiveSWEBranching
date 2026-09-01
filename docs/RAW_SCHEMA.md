@@ -1,6 +1,8 @@
 # Raw data schema
 
-Schema version `1` is intentionally event-oriented and utility-agnostic.
+Schema version `2` is intentionally event-oriented and label-agnostic. Version
+2 adds the single-layer parent-continuation group and explicit saved prefix
+checkpoint links required by the shared success-probability model.
 
 ## Experiment manifest
 
@@ -28,27 +30,58 @@ Checkpoint ID, task/trajectory identity, absolute step, pinned image, workspace
 hash, Git state and diff, modified files, history/model-input hashes, restore
 fingerprint, cost to checkpoint, and paths to the workspace and scaffold state.
 
-## BranchGroupRecord
+## ContinuationRecord and ParentContinuationGroupRecord
+
+This is the Phase-4 source of truth. For one parent checkpoint, a parent group
+links `K` independent full continuation records and records
+`candidate_source = random | swe_replay`. Each continuation stores its exact
+source checkpoint, seed, full trajectory link, terminal outcome, post-parent
+vector cost, final patch and termination reason. The linked trajectory preserves
+every post-parent action/observation step.
+
+`post_parent_step_start` and `post_parent_step_count` locate the post-parent
+slice explicitly even if a storage backend later embeds it in a longer
+trajectory. Variable `K` is valid; invalid infrastructure continuations remain
+recorded but are excluded from `K_s` when labels are derived.
+
+At each configured prefix depth, `prefix_checkpoint_ids_by_depth` links the
+actual saved executable child checkpoint. This is necessary because B must score
+the real state after `d` steps, including workspace and Git changes, not only a
+text transcript.
+
+The same group yields:
+
+- one grouped parent success-probability target `(successes, valid_K)`;
+- one Bernoulli success-probability target for every saved prefix state at
+  `d in {1,2,4,6}`, using that continuation's terminal outcome.
+
+Both target types train the same `q(state)` model. A transforms the parent's
+prediction with `4 q(1-q)`; B selects the largest child prediction.
+
+No short child is rolled out another `K` times in the Phase-4 protocol.
+
+## Generic online branch records
+
+The following records remain useful for executing a later online temporary
+branch decision, but they are not the Phase-4 A/B label-generation tree.
+
+### BranchGroupRecord
 
 Parent checkpoint, configured `N`, local span, seeds, child trajectory IDs and
 resulting child checkpoint IDs. It records what was generated, not whether an
 analysis later calls the group useful.
 
-## ChildBranchRecord
+### ChildBranchRecord
 
 Branch index/seed and links to the actual local trajectory and resulting child
-checkpoint. A bounded run may attach one immediate downstream result here; the
-general repeated-continuation evidence is represented below.
+checkpoint. A bounded online run may attach one selected downstream result.
 
-## ContinuationRecord and CounterfactualGroupRecord
+### CounterfactualGroupRecord (generic, not Phase 4)
 
-Every no-branch or child-downstream draw is a separate continuation record with
-its source checkpoint, role, seed, full trajectory link, outcome, vector cost,
-patch and termination. A counterfactual group links the parent checkpoint, its
-no-branch draws, one concrete branch group, and all downstream draws for every
-child. This preserves the complete empirical distributions needed by Oracle A
-and B without storing success probability, headroom, or a preferred utility in
-the raw layer.
+This older generic schema can represent nested counterfactual experiments for a
+future method that explicitly needs them. Phase 4 neither produces nor consumes
+it. Keeping the dataclass avoids deleting a potentially useful general record;
+its docstring and storage kind mark it outside the finalized Phase-4 protocol.
 
 ## VerifierRecord
 
@@ -57,6 +90,6 @@ report reference, measured verifier cost, and infrastructure error when invalid.
 
 ## Derived data
 
-Success probabilities, conditional costs, branching headroom, pairwise
-preference and Oracle ranks belong under a separate `derived/` analysis output.
-They are never added to or used to rewrite raw records.
+Success-probability targets, branchability and Oracle ranks belong under a
+separate `derived/` analysis output. They are never added to or used to rewrite
+raw records.

@@ -6,8 +6,10 @@ from adaptive_swe_branching.baselines.swe_replay.types import ReplayResult
 from adaptive_swe_branching.data.records import Cost, Outcome
 from adaptive_swe_branching.evaluation.matched_compute import StrategyTrace
 from adaptive_swe_branching.oracle.judgers import OracleA, OracleB
-from adaptive_swe_branching.oracle.records import CounterfactualExperiment, FutureSample
-from adaptive_swe_branching.oracle.utility import OutcomeUtility
+from adaptive_swe_branching.oracle.records import (
+    FutureSample,
+    ParentContinuationExperiment,
+)
 
 
 def single_chain(task_id: str, sample: FutureSample) -> StrategyTrace:
@@ -17,9 +19,7 @@ def single_chain(task_id: str, sample: FutureSample) -> StrategyTrace:
 def best_of_n(
     task_id: str, samples: tuple[FutureSample, ...], *, n: int
 ) -> StrategyTrace:
-    if n < 1 or len(samples) < n:
-        raise ValueError("Best-of-N needs at least N independent samples")
-    chosen = samples[:n]
+    chosen = _valid_prefix(samples, n)
     total = sum((sample.cost_from_state for sample in chosen), Cost())
     solved = next(
         (sample for sample in chosen if sample.outcome == Outcome.SOLVED), None
@@ -35,34 +35,39 @@ def best_of_n(
 
 
 def random_branching(
-    experiment: CounterfactualExperiment, *, seed: int
+    experiment: ParentContinuationExperiment,
+    *,
+    n: int,
+    branch_span: int,
+    seed: int,
 ) -> StrategyTrace:
-    rng = random.Random(seed)
-    child = rng.choice(experiment.children)
-    sample = rng.choice(child.samples)
-    acquisition = sum(
-        (candidate.local_branch_cost for candidate in experiment.children), Cost()
-    )
-    total = acquisition + sample.cost_from_state
-    return _trace(experiment.task_id, "random_branching", sample, total)
+    candidates = _sample_siblings(experiment, n=n, seed=seed)
+    selected = random.Random(seed + 1).choice(candidates)
+    total = _temporary_branch_cost(candidates, selected, branch_span)
+    return _trace(experiment.task_id, f"random_branching_n{n}", selected, total)
 
 
 def oracle_a_b(
-    experiment: CounterfactualExperiment,
+    experiment: ParentContinuationExperiment,
     *,
-    utility: OutcomeUtility,
-    headroom_threshold: float,
-    evaluation_seed: int,
+    branchability_threshold: float,
+    n: int,
+    branch_span: int,
+    seed: int,
 ) -> StrategyTrace:
-    measurement = OracleA().measure(experiment, utility=utility)
-    rng = random.Random(evaluation_seed)
-    if measurement.branching_headroom <= headroom_threshold:
-        sample = rng.choice(experiment.no_branch_samples)
-        return _trace(experiment.task_id, "oracle_a_b", sample, sample.cost_from_state)
-    child = OracleB().select(experiment.children)
-    sample = rng.choice(child.samples)
-    total = measurement.local_branch_cost + sample.cost_from_state
-    return _trace(experiment.task_id, "oracle_a_b", sample, total)
+    rng = random.Random(seed)
+    if not OracleA().decide(experiment, threshold=branchability_threshold):
+        selected = rng.choice(experiment.valid_samples)
+        return _trace(
+            experiment.task_id,
+            f"oracle_a_b_n{n}",
+            selected,
+            selected.cost_from_state,
+        )
+    candidates = _sample_siblings(experiment, n=n, seed=seed)
+    selected = OracleB().select(candidates)
+    total = _temporary_branch_cost(candidates, selected, branch_span)
+    return _trace(experiment.task_id, f"oracle_a_b_n{n}", selected, total)
 
 
 def faithful_swe_replay(task_id: str, result: ReplayResult) -> StrategyTrace:
@@ -79,8 +84,55 @@ def faithful_swe_replay(task_id: str, result: ReplayResult) -> StrategyTrace:
         cost_from_state=total,
         final_patch=selected.trajectory.final_patch,
         termination_reason=selected.trajectory.termination_reason,
+        steps=selected.trajectory.steps,
     )
     return _trace(task_id, "faithful_swe_replay", sample, total)
+
+
+def _valid_prefix(
+    samples: tuple[FutureSample, ...], n: int
+) -> tuple[FutureSample, ...]:
+    valid = tuple(sample for sample in samples if sample.outcome != Outcome.INVALID)
+    if n < 1 or len(valid) < n:
+        raise ValueError("strategy needs at least N valid independent samples")
+    return valid[:n]
+
+
+def _sample_siblings(
+    experiment: ParentContinuationExperiment, *, n: int, seed: int
+) -> tuple[FutureSample, ...]:
+    valid = experiment.valid_samples
+    if n < 1 or len(valid) < n:
+        raise ValueError("temporary branching needs at least N valid continuations")
+    return tuple(random.Random(seed).sample(valid, n))
+
+
+def _temporary_branch_cost(
+    candidates: tuple[FutureSample, ...],
+    selected: FutureSample,
+    branch_span: int,
+) -> Cost:
+    if branch_span < 1:
+        raise ValueError("branch span must be positive")
+    # The selected continuation's full cost already includes its prefix. Every
+    # sibling that is discarded is charged only for the prefix actually run.
+    discarded_prefixes = sum(
+        (
+            _prefix_cost(candidate, branch_span)
+            for candidate in candidates
+            if candidate.trajectory_id != selected.trajectory_id
+        ),
+        Cost(),
+    )
+    return selected.cost_from_state + discarded_prefixes
+
+
+def _prefix_cost(sample: FutureSample, branch_span: int) -> Cost:
+    if not sample.steps:
+        raise ValueError(
+            f"sample {sample.trajectory_id} has no step records for prefix costing"
+        )
+    return sum((step.cost for step in sample.steps[:branch_span]), Cost())
 
 
 def _trace(

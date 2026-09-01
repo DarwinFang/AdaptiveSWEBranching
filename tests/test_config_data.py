@@ -31,3 +31,15 @@ def test_raw_store_is_immutable(tmp_path: Path) -> None:
     store.put("task", "one", {"x": 1})
     with pytest.raises(FileExistsError):
         store.put("task", "one", {"x": 2})
+
+
+def test_phase4_manifest_freezes_single_shared_q_model() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config = load_config(
+        project_root / "configs/experiments/phase4_oracle_pilot.yaml"
+    )
+    model = config["shared_success_probability_model"]
+    assert model["separate_a_b_models"] is False
+    assert model["pairwise_head"] is False
+    assert config["label_rollout"]["nested_child_downstream_rollouts"] is False
+    assert config["inference_roles"]["judger_b"]["selection"] == "argmax_q_child"

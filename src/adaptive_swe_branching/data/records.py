@@ -172,6 +172,9 @@ class ContinuationRecord:
     cost_from_source: Cost
     final_patch: str
     termination_reason: str
+    post_parent_step_start: int = 0
+    post_parent_step_count: int | None = None
+    prefix_checkpoint_ids_by_depth: dict[int, str] = field(default_factory=dict)
     branch_group_id: str | None = None
     child_checkpoint_id: str | None = None
     invalid_reason: str | None = None
@@ -183,7 +186,24 @@ class ContinuationRecord:
 
 
 @dataclass(frozen=True)
+class ParentContinuationGroupRecord:
+    """One parent checkpoint and its single layer of full continuations."""
+
+    group_id: str
+    task_id: str
+    parent_checkpoint_id: str
+    candidate_source: str
+    requested_k: int
+    continuation_ids: tuple[str, ...]
+    protocol: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class CounterfactualGroupRecord:
+    """Generic nested counterfactual structure; not used by Phase 4 A/B labels."""
     counterfactual_group_id: str
     task_id: str
     parent_checkpoint_id: str

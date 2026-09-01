@@ -43,7 +43,7 @@ class SelectiveBranchingScheduler:
         if not gate.branch:
             return SchedulingDecision("gate_rejected", gate, None, None)
         group, children = self.brancher.branch(checkpoint)
-        ranked = self.ranker.rank(children)
+        ranked = self.ranker.rank(checkpoint, children)
         if not ranked:
             raise RuntimeError("ranker returned no child after branching")
         # The caller resumes only this checkpoint: the population collapses.

@@ -19,6 +19,13 @@ class ChildExecution:
     child_checkpoint: CheckpointRecord
 
 
+@dataclass(frozen=True)
+class ExecutableChild:
+    record: ChildBranchRecord
+    local_trajectory: TrajectoryRecord
+    checkpoint: CheckpointRecord
+
+
 class BranchBackend(Protocol):
     def run_child(
         self,
@@ -54,7 +61,7 @@ class TemporaryBrancher:
 
     def branch(
         self, parent: CheckpointRecord
-    ) -> tuple[BranchGroupRecord, tuple[ChildBranchRecord, ...]]:
+    ) -> tuple[BranchGroupRecord, tuple[ExecutableChild, ...]]:
         group_id = stable_sha256(
             {
                 "parent": parent.checkpoint_id,
@@ -77,20 +84,24 @@ class TemporaryBrancher:
             for index, seed in enumerate(seeds)
         )
         children = tuple(
-            ChildBranchRecord(
-                child_branch_id=stable_sha256(
-                    {"branch_group": group_id, "index": index}
+            ExecutableChild(
+                record=ChildBranchRecord(
+                    child_branch_id=stable_sha256(
+                        {"branch_group": group_id, "index": index}
+                    ),
+                    branch_group_id=group_id,
+                    branch_index=index,
+                    seed=seeds[index],
+                    local_trajectory_id=execution.local_trajectory.trajectory_id,
+                    child_checkpoint_id=execution.child_checkpoint.checkpoint_id,
+                    downstream_trajectory_id=None,
+                    downstream_outcome=None,
+                    downstream_cost=None,
+                    final_patch=None,
+                    termination_reason=None,
                 ),
-                branch_group_id=group_id,
-                branch_index=index,
-                seed=seeds[index],
-                local_trajectory_id=execution.local_trajectory.trajectory_id,
-                child_checkpoint_id=execution.child_checkpoint.checkpoint_id,
-                downstream_trajectory_id=None,
-                downstream_outcome=None,
-                downstream_cost=None,
-                final_patch=None,
-                termination_reason=None,
+                local_trajectory=execution.local_trajectory,
+                checkpoint=execution.child_checkpoint,
             )
             for index, execution in enumerate(executions)
         )
@@ -111,5 +122,7 @@ class TemporaryBrancher:
         if self.store is not None:
             self.store.put("branch_group", group_id, group)
             for child in children:
-                self.store.put("child_branch", child.child_branch_id, child)
+                self.store.put(
+                    "child_branch", child.record.child_branch_id, child.record
+                )
         return group, children

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from adaptive_swe_branching.data.records import Cost, Outcome
-from adaptive_swe_branching.oracle.utility import cost_value
+from adaptive_swe_branching.evaluation.costs import cost_value
 
 
 @dataclass(frozen=True)
