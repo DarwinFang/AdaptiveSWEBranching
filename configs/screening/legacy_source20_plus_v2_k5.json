@@ -1,0 +1,857 @@
+{
+  "definition": "ordinary root Agent outcome within at most 20 steps",
+  "purpose": "screening_seed_only_not_training_or_evaluation",
+  "schema_version": 1,
+  "source_manifest_sha256": {
+    "vf_multidepth_v1": "d0cf87eeae1dd840f0a16c1d7990a9615a303f5d10de88455db3cd7762d8327b",
+    "vf_multidepth_v1_expand1": "9bd73a167680c8db66c9c815c2dcfeb8a18893d2f41cd97e6f9223c3a70c7565"
+  },
+  "source_run_roots": [
+    "/home/fangzhaohao/recov-runs/vf_multidepth_v1",
+    "/home/fangzhaohao/recov-runs/vf_multidepth_v1_expand1"
+  ],
+  "supplemental_screening_run_root": "/home/fangzhaohao/asb-runs/difficulty_screen_v2_20step",
+  "target_valid_runs": 5,
+  "tasks": [
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1+difficulty_screen_v2_20step",
+      "successes": 1,
+      "task_id": "PyCQA__flake8.cf1542ce.func_basic__uxkmhh8a",
+      "valid_runs": 5
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1+difficulty_screen_v2_20step",
+      "successes": 1,
+      "task_id": "adrienverge__yamllint.8513d9b9.func_pm_op_swap__bvcpzzfd",
+      "valid_runs": 5
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1+difficulty_screen_v2_20step",
+      "successes": 2,
+      "task_id": "aio-libs__async-timeout.d0baa9f1.lm_rewrite__kqd6t1mb",
+      "valid_runs": 4
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 2,
+      "task_id": "alanjds__drf-nested-routers.6144169d.func_basic__c6wzdae3",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "andialbrecht__sqlparse.e57923b3.func_basic__dmfqd8zr",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 1,
+      "task_id": "arrow-py__arrow.1d70d009.func_basic__w1skinei",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "bottlepy__bottle.a8dfef30.func_basic__9dja9e7b",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 2,
+      "task_id": "cool-RR__PySnooper.57472b46.lm_rewrite__xxcs25kj",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 1,
+      "task_id": "dask__dask.5f61e423.pr_10500",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 1,
+      "task_id": "django-money__django-money.835c1ab8.combine_file__yw0532zq",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "getmoto__moto.694ce1f4.func_pm_op_change_const__wqulq5xs",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "gweis__isodate.17cb25eb.combine_file__4u5mlu9j",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 1,
+      "task_id": "keleshev__schema.24a30457.func_basic__lgfgdj4p",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 2,
+      "task_id": "madzak__python-json-logger.5f85723f.func_basic__srwm2rsn",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 1,
+      "task_id": "mahmoud__boltons.3bfcfdd0.combine_file__eml7ze28",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "mahmoud__boltons.3bfcfdd0.combine_file__ndadca3f",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "marshmallow-code__marshmallow.9716fc62.func_basic__i9dmvjw5",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "mozillazg__python-pinyin.e42dede5.lm_rewrite__9bj7zxrb",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 1,
+      "task_id": "pallets__click.fde47b4b.func_basic__49f3239e",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 1,
+      "task_id": "pdfminer__pdfminer.six.1a8bd2f7.func_pm_class_rm_funcs__2rr3ss90",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "pylint-dev__astroid.b114f6b5.func_basic__svde891l",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 2,
+      "task_id": "pytest-dev__iniconfig.16793ead.combine_file__mntnwwxj",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "python-hyper__h11.bed0dd4a.func_pm_ctrl_invert_if__uzlonb93",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 1,
+      "task_id": "python-jsonschema__jsonschema.93e0caa5.func_pm_ctrl_invert_if__gev90an0",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "python-openxml__python-docx.0cf6d71f.func_basic__rug1yvr0",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 1,
+      "task_id": "rubik__radon.54b88e58.func_pm_op_swap__sbd33ss8",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 2,
+      "task_id": "rustedpy__result.0b855e1e.func_basic__xhu5lhzl",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 1,
+      "task_id": "tweepy__tweepy.91a41c6e.func_pm_ctrl_shuffle__h9zp3mnp",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_medium",
+      "source": "vf_multidepth_v1",
+      "successes": 2,
+      "task_id": "un33k__python-slugify.872b3750.func_basic__bkpog0ey",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "Instagram__MonkeyType.70c3acf6.func_pm_op_swap__s010gmhf",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "Suor__funcy.207a7810.combine_file__m9nft7o1",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "aio-libs__async-timeout.d0baa9f1.func_basic__etiyc452",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "alecthomas__voluptuous.a7a55f83.func_basic__72ej4qbr",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "benoitc__gunicorn.bacbf8aa.func_basic__d1nioyl6",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "borntyping__python-colorlog.dfa10f59.func_pm_class_rm_base__8anh0pe1",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "burnash__gspread.a8be3b96.func_pm_ctrl_shuffle__q6bn3k4m",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "chardet__chardet.9630f238.lm_rewrite__o6cdsx1f",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "django__daphne.32ac73e1.lm_rewrite__gjk1btuw",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "google__textfsm.c31b6007.func_basic__j4r5n7be",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "john-kurkowski__tldextract.3d1bf184.lm_rewrite__xyp6lbg8",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "joke2k__faker.8b401a7d.lm_rewrite__md05v40d",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "joke2k__faker.8b401a7d.lm_rewrite__szpd1hqw",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "mahmoud__glom.fb3c4e76.func_pm_op_change_const__xtmc18we",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "marshmallow-code__webargs.dbde72fe.func_basic__jauw8jbo",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "mewwts__addict.75284f95.func_basic__lfaczs5w",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "pallets__jinja.ada0a9a6.func_basic__cw47e24l",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "pyasn1__pyasn1.0f07d724.func_pm_ctrl_shuffle__cm0b7uxw",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "python-jsonschema__jsonschema.93e0caa5.lm_rewrite__exrk9qig",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "pyutils__line_profiler.a646bf0f.func_pm_ctrl_shuffle__kogi5cjr",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "rustedpy__result.0b855e1e.func_basic__mugbsvbk",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "seperman__deepdiff.ed252022.func_pm_ctrl_shuffle__2xwnxwxh",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 3,
+      "task_id": "sunpy__sunpy.f8edfd5c.func_pm_ctrl_shuffle__sqvhyton",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_easy",
+      "source": "vf_multidepth_v1",
+      "successes": 3,
+      "task_id": "theskumar__python-dotenv.2b8635b7.func_basic__7hsrajlb",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "Cog-Creators__Red-DiscordBot.33e0eac7.func_basic__vva8yhj1",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "Knio__dominate.9082227e.pr_187",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "agronholm__exceptiongroup.0b4f4937.combine_module__kgxoavlo",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "amueller__word_cloud.ec24191c.func_pm_remove_assign__1es9bbr0",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "andialbrecht__sqlparse.e57923b3.func_basic__4gsssbwq",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "arrow-py__arrow.1d70d009.func_pm_op_change__1r8eml1h",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "bottlepy__bottle.a8dfef30.lm_rewrite__drqgvm47",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "cantools__cantools.0c6a7871.combine_file__fclv3kpn",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "cantools__cantools.0c6a7871.lm_rewrite__ca8a40ad",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "cool-RR__PySnooper.57472b46.combine_file__u4g8t3jg",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "dask__dask.5f61e423.pr_9184",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "dbader__schedule.82a43db1.combine_file__fd66g5jv",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "django-money__django-money.835c1ab8.combine_module__syqq7e00",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "django__daphne.32ac73e1.lm_rewrite__ojdz9h3d",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "encode__starlette.db5063c2.func_basic__21hpha64",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "encode__starlette.db5063c2.lm_rewrite__xe3h313f",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "facebookresearch__fvcore.a491d5b9.func_pm_remove_assign__jafbltn2",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "facebookresearch__fvcore.a491d5b9.lm_rewrite__5few0rni",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "gawel__pyquery.811cd048.func_pm_remove_cond__vcfovd51",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "google__textfsm.c31b6007.combine_file__bgk6tlx2",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "gruns__furl.da386f68.func_basic__2uqky8ob",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "gruns__icecream.f76fef56.func_pm_ctrl_shuffle__z95tfg9w",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "iterative__dvc.1d6ea681.pr_9601",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "jaraco__inflect.c079a96a.lm_rewrite__ptbr8fjy",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "jd__tenacity.0d40e76f.combine_file__x4ymm5x6",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "jsvine__pdfplumber.02ff4313.lm_rewrite__3422x070",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "keleshev__schema.24a30457.func_basic__bv8ooprw",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "lepture__mistune.bf54ef67.combine_module__80u6mu3d",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "life4__textdistance.c3aca916.combine_module__3mnyuz7e",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "luozhouyang__python-string-similarity.115acaac.func_pm_class_rm_funcs__hv4o2all",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "marshmallow-code__apispec.8b421526.func_basic__jr6np4xe",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "martinblech__xmltodict.0952f382.lm_rewrite__q6x1c25t",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "matthewwithanm__python-markdownify.6258f5c3.func_basic__bdc2pydv",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "matthewwithanm__python-markdownify.6258f5c3.func_basic__iavpvl9f",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "mido__mido.a0158ff9.combine_file__a089sbfn",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "mido__mido.a0158ff9.combine_file__wzi5wc05",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "modin-project__modin.8c7799fd.func_pm_remove_assign__1ej49r0o",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "mozilla__bleach.73871d76.combine_file__fk1pvc74",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "pallets__markupsafe.620c06c9.combine_file__6fk2d773",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "pydata__patsy.a5d16484.combine_file__742yas93",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "pydata__patsy.a5d16484.func_basic__6mg3yb6x",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "pygments__pygments.27649ebb.combine_file__shzpg0zs",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "pyparsing__pyparsing.533adf47.combine_file__f4f4axg1",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "pytest-dev__iniconfig.16793ead.combine_module__h23o5xn0",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "python-hyper__h11.bed0dd4a.func_pm_class_rm_funcs__jtn92p13",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "python-openxml__python-docx.0cf6d71f.func_basic__35v8kkyb",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "python__mypy.e93f06ce.pr_10430",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "pyupio__safety.7654596b.func_pm_remove_cond__0dxrmu93",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "r1chardj0n3s__parse.30da9e4f.func_pm_ctrl_shuffle__ckf9bzo4",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "rsalmei__alive-progress.35853799.lm_rewrite__nvko9jr9",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "seperman__deepdiff.ed252022.combine_file__6bbvwjpi",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "spulec__freezegun.5f171db0.func_basic__32cpjvsd",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "sqlfluff__sqlfluff.50a1c4b6.combine_module__njpyntqw",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "sqlfluff__sqlfluff.50a1c4b6.func_pm_remove_assign__tf2mx3ks",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "stanfordnlp__dspy.651a4c71.func_pm_remove_assign__ibtqozgu",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "stanfordnlp__dspy.651a4c71.lm_rewrite__59lz1v6c",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "theskumar__python-dotenv.2b8635b7.lm_rewrite__u0pft0jx",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "tobymao__sqlglot.036601ba.combine_module__ewmydl2q",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "tobymao__sqlglot.036601ba.func_pm_ctrl_shuffle__yjoz2fw7",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "tox-dev__pipdeptree.c31b6418.combine_file__ni8aa0y5",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "screen_hard",
+      "source": "vf_multidepth_v1_expand1",
+      "successes": 0,
+      "task_id": "un33k__python-slugify.872b3750.lm_rewrite__10gtvo7v",
+      "valid_runs": 3
+    },
+    {
+      "old_class": "incomplete",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "borntyping__python-colorlog.dfa10f59.func_basic__zefnzxb0",
+      "valid_runs": 1
+    },
+    {
+      "old_class": "incomplete",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "chardet__chardet.9630f238.lm_rewrite__ljtsbcii",
+      "valid_runs": 0
+    },
+    {
+      "old_class": "incomplete",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "getnikola__nikola.0f4c230e.func_pm_remove_loop__lh550kbr",
+      "valid_runs": 0
+    },
+    {
+      "old_class": "incomplete",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "gweis__isodate.17cb25eb.combine_module__xrx4rtyu",
+      "valid_runs": 0
+    },
+    {
+      "old_class": "incomplete",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "mozillazg__python-pinyin.e42dede5.lm_rewrite__ucctznq5",
+      "valid_runs": 1
+    },
+    {
+      "old_class": "incomplete",
+      "source": "vf_multidepth_v1",
+      "successes": 0,
+      "task_id": "r1chardj0n3s__parse.30da9e4f.combine_file__gag0ta2m",
+      "valid_runs": 0
+    }
+  ]
+}

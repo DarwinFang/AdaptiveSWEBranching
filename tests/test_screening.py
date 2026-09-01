@@ -29,7 +29,22 @@ from adaptive_swe_branching.screening.runner import (
     ],
 )
 def test_frozen_eight_run_screening_boundaries(successes, expected) -> None:
-    assert difficulty_class(successes) == expected
+    assert difficulty_class(successes, valid_runs=8) == expected
+
+
+@pytest.mark.parametrize(
+    ("successes", "expected"),
+    [
+        (0, SCREEN_HARD),
+        (1, SCREEN_HARD),
+        (2, SCREEN_MEDIUM),
+        (3, SCREEN_MEDIUM),
+        (4, SCREEN_EASY),
+        (5, SCREEN_EASY),
+    ],
+)
+def test_frozen_five_run_screening_boundaries(successes, expected) -> None:
+    assert difficulty_class(successes, valid_runs=5) == expected
 
 
 @pytest.mark.parametrize(
@@ -49,7 +64,7 @@ def test_screening_stops_only_when_final_class_is_mathematically_fixed(
     successes, observed, expected, possible
 ) -> None:
     assert resolved_difficulty_class(
-        successes, observed_valid_runs=observed
+        successes, observed_valid_runs=observed, target_valid_runs=8
     ) == (expected, possible)
 
 
@@ -64,15 +79,23 @@ def test_compatible_imported_tasks_are_screened_first() -> None:
 
 
 @pytest.mark.parametrize(
-    ("observed", "workers", "expected"),
-    [(0, 4, 4), (3, 4, 3), (5, 4, 1), (6, 4, 1), (7, 4, 1)],
+    ("successes", "observed", "target", "workers", "expected"),
+    [
+        (0, 0, 5, 4, 4),
+        (1, 3, 5, 4, 1),
+        (0, 4, 5, 4, 1),
+        (1, 3, 8, 4, 3),
+        (2, 5, 8, 4, 1),
+        (3, 6, 8, 4, 1),
+    ],
 )
 def test_parallel_batches_never_launch_past_first_possible_decision(
-    observed, workers, expected
+    successes, observed, target, workers, expected
 ) -> None:
     assert safe_parallel_batch_size(
+        successes=successes,
         observed_valid_runs=observed,
-        target_valid_runs=8,
+        target_valid_runs=target,
         maximum_workers=workers,
     ) == expected
 

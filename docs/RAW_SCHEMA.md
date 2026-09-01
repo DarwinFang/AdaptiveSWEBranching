@@ -112,8 +112,8 @@ parent before selecting an already-generated untried child; it never resamples.
 order, seed, eligible-pool hash, repository mapping and any imported 20-step
 `k/m` counts. `ScreeningRunRecord` links one fresh root trajectory and records
 its seed, terminal outcome, invalid status and measured costs.
-`ScreeningTaskRecord` is written when the frozen eight-run class is
-mathematically fixed, after eight valid outcomes, or after explicit
+`ScreeningTaskRecord` is written when the frozen five-run class is
+mathematically fixed, after five valid outcomes, or after explicit
 infrastructure invalidation. It stores the operational `screen_hard`,
 `screen_medium` or `screen_easy` class plus imported/fresh evidence counts. A deterministic cohort is
 frozen only after all three quotas are reached. Every linked trajectory has

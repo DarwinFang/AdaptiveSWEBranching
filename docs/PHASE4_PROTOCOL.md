@@ -55,9 +55,9 @@ do not reveal an exact empirical `q` for any individual child.
 ## Independent task screening
 
 The active screen is `difficulty_screen_v2_20step`. It measures success within
-20 ordinary Agent steps, budgets up to eight valid root outcomes per task and
-classifies 0--2 successes as
-`screen_hard`, 3--5 as `screen_medium`, and 6--8 as `screen_easy`. Fixed-seed
+20 ordinary Agent steps, budgets up to five valid root outcomes per task and
+classifies 0--1 successes as
+`screen_hard`, 2--3 as `screen_medium`, and 4--5 as `screen_easy`. Fixed-seed
 sampling prioritizes the earlier 60+60 tasks, then proceeds without replacement
 until all quotas are met: 300 medium,
 100 easy and 100 hard. Infrastructure-invalid attempts are retained and
@@ -70,10 +70,9 @@ labels or evaluation samples. Later continuation value remains a separate
 
 Independent root runs may execute concurrently across the two frozen Qwen
 endpoints. Batches stop before the earliest point at which a class could become
-fixed: a fresh task launches four then two runs, while a task with three
-imported outcomes launches three. After six outcomes, any still-needed run is
-launched one at a time so concurrency never creates a known-redundant seventh
-or eighth run.
+fixed: a fresh task launches four runs, while a task with three imported
+outcomes launches only one. At four outcomes, 0/4, 2/4 and 4/4 are already
+fixed; only 1/4 and 3/4 launch the fifth run.
 
 The older six-run screen below remains historical pilot evidence only.
 

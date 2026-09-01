@@ -45,14 +45,16 @@ SCREEN_EASY = "screen_easy"
 SCREEN_INVALID = "screening_invalid"
 
 
-def difficulty_class(successes: int, *, valid_runs: int = 8) -> str:
-    if valid_runs != 8:
-        raise ValueError("difficulty class requires exactly 8 valid runs")
+def difficulty_class(successes: int, *, valid_runs: int = 5) -> str:
+    if valid_runs not in {5, 8}:
+        raise ValueError("difficulty class supports the frozen 5- or 8-run rules")
     if not 0 <= successes <= valid_runs:
-        raise ValueError("successes must be between 0 and 8")
-    if successes <= 2:
+        raise ValueError("successes must be between zero and valid_runs")
+    hard_maximum = 1 if valid_runs == 5 else 2
+    medium_maximum = 3 if valid_runs == 5 else 5
+    if successes <= hard_maximum:
         return SCREEN_HARD
-    if successes <= 5:
+    if successes <= medium_maximum:
         return SCREEN_MEDIUM
     return SCREEN_EASY
 
@@ -61,9 +63,9 @@ def resolved_difficulty_class(
     successes: int,
     *,
     observed_valid_runs: int,
-    target_valid_runs: int = 8,
+    target_valid_runs: int = 5,
 ) -> tuple[str | None, tuple[int, int]]:
-    """Resolve an 8-run class once every remaining outcome gives one class."""
+    """Resolve a class once every remaining outcome gives the same class."""
     if not 0 <= successes <= observed_valid_runs <= target_valid_runs:
         raise ValueError("success/run counts must satisfy 0 <= k <= n <= target")
     remaining = target_valid_runs - observed_valid_runs
@@ -115,12 +117,28 @@ def order_screening_pool(
 
 
 def safe_parallel_batch_size(
-    *, observed_valid_runs: int, target_valid_runs: int, maximum_workers: int
+    *,
+    successes: int,
+    observed_valid_runs: int,
+    target_valid_runs: int,
+    maximum_workers: int,
 ) -> int:
     """Parallelize only runs that cannot yet make later launches redundant."""
     if not 0 <= observed_valid_runs < target_valid_runs:
         return 0
-    until_first_possible_resolution = max(1, 6 - observed_valid_runs)
+    until_first_possible_resolution = target_valid_runs - observed_valid_runs
+    for additional in range(1, target_valid_runs - observed_valid_runs + 1):
+        if any(
+            resolved_difficulty_class(
+                successes + added_successes,
+                observed_valid_runs=observed_valid_runs + additional,
+                target_valid_runs=target_valid_runs,
+            )[0]
+            is not None
+            for added_successes in range(additional + 1)
+        ):
+            until_first_possible_resolution = additional
+            break
     return min(
         maximum_workers,
         target_valid_runs - observed_valid_runs,
@@ -151,8 +169,8 @@ class DifficultyScreeningRunner:
         self.root_seed = int(self.experiment["root_seed"])
         self.target_valid = int(self.screen["valid_runs_per_task"])
         self.maximum_attempts = int(self.screen["maximum_total_attempts_per_task"])
-        if self.target_valid != 8:
-            raise ValueError("difficulty_screen_v1 freezes 8 valid root runs")
+        if self.target_valid not in {5, 8}:
+            raise ValueError("difficulty screening supports 5 or 8 valid root runs")
         if self.maximum_attempts < self.target_valid:
             raise ValueError("maximum attempts cannot be below valid-run target")
         self.quotas = {
@@ -395,6 +413,7 @@ class DifficultyScreeningRunner:
             if next_attempt >= self.maximum_attempts:
                 break
             batch_size = safe_parallel_batch_size(
+                successes=successes,
                 observed_valid_runs=imported_valid_runs + len(valid),
                 target_valid_runs=self.target_valid,
                 maximum_workers=self.parallel_workers,
