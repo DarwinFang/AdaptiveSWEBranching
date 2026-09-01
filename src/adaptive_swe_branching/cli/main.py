@@ -216,6 +216,7 @@ def _agent(config: dict[str, Any], seed: int):
         timeout_seconds=float(config["timeout_seconds"]),
         retries=int(config["retries"]),
         native_tool_calling=bool(config["native_tool_calling"]),
+        reasoning_effort=config.get("reasoning_effort"),
         tools=tuple(config["tools"]),
         max_iterations_per_step=int(config["max_iterations_per_step"]),
         seed=seed,

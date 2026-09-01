@@ -34,6 +34,7 @@ class OpenHandsSession:
         timeout_seconds: float,
         retries: int,
         native_tool_calling: bool,
+        reasoning_effort: str | None,
         tools: tuple[str, ...],
         max_iterations_per_step: int,
         seed: int,
@@ -58,6 +59,8 @@ class OpenHandsSession:
             "timeout": timeout_seconds,
             "num_retries": retries,
             "native_tool_calling": native_tool_calling,
+            "reasoning_effort": reasoning_effort,
+            "enable_encrypted_reasoning": False,
         }
         self.task: TaskRecord | None = None
         self.container: DockerContainer | None = None
