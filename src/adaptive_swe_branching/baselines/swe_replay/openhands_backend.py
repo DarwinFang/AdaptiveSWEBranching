@@ -191,7 +191,7 @@ class OpenHandsReplayBackend:
             final_patch=final_patch,
             total_cost=full_cost,
             termination_reason=(
-                "agent_finished" if agent.finished else "absolute_step_cap"
+                agent.termination_reason if agent.finished else "absolute_step_cap"
             ),
             parent_checkpoint_id=parent_checkpoint_id,
             final_answer=agent.final_answer,

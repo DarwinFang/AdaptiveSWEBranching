@@ -71,6 +71,7 @@ class OpenHandsSession:
         self._cost = Cost()
         self._finished = False
         self._final_answer: str | None = None
+        self._termination_reason: str | None = None
         self._explored_files: set[str] = set()
 
     @classmethod
@@ -116,6 +117,10 @@ class OpenHandsSession:
     def final_answer(self) -> str | None:
         return self._final_answer
 
+    @property
+    def termination_reason(self) -> str | None:
+        return self._termination_reason
+
     def _build(self) -> None:
         from openhands.sdk import LLM, Agent, LocalConversation, Tool
 
@@ -144,6 +149,7 @@ class OpenHandsSession:
         self._cost = Cost()
         self._finished = False
         self._final_answer = None
+        self._termination_reason = None
         self._explored_files = set()
         CONTAINERS.register(container)
         try:
@@ -197,11 +203,14 @@ class OpenHandsSession:
         answer = _assistant_text(raw)
         status = getattr(self._conversation.state, "execution_status", "")
         status_name = getattr(status, "name", str(status)).casefold()
-        if answer or status_name == "finished":
-            self._finished = True
+        self._finished, self._termination_reason = _completion_from_status(
+            status_name=status_name,
+            answer=answer,
+            previously_finished=self._finished,
+            previous_reason=self._termination_reason,
+        )
+        if answer:
             self._final_answer = answer or self._final_answer
-        elif status_name in {"error", "stopped", "stuck"}:
-            raise RuntimeError(f"OpenHands ended with status {status_name}")
         usage_after = self._usage()
         cost = Cost(
             steps=1,
@@ -272,6 +281,7 @@ class OpenHandsSession:
                 "cost": self._cost,
                 "finished": self._finished,
                 "final_answer": self._final_answer,
+                "termination_reason": self._termination_reason,
                 "explored_files": self._explored_files,
                 "events": events,
                 "agent_state": copy.deepcopy(self._conversation._state.agent_state),
@@ -323,6 +333,7 @@ class OpenHandsSession:
         self._cost = payload["cost"]
         self._finished = bool(payload["finished"])
         self._final_answer = payload.get("final_answer")
+        self._termination_reason = payload.get("termination_reason")
         self._explored_files = set(payload.get("explored_files", []))
         if stable_sha256(self.history_payload()) != snapshot.history_hash:
             raise RuntimeError("restored OpenHands history does not match checkpoint")
@@ -341,6 +352,24 @@ class OpenHandsSession:
 
 async def _await(value: Any) -> Any:
     return await value
+
+
+def _completion_from_status(
+    *,
+    status_name: str,
+    answer: str | None,
+    previously_finished: bool,
+    previous_reason: str | None,
+) -> tuple[bool, str | None]:
+    if answer or status_name == "finished":
+        return True, "agent_finished"
+    if status_name in {"stuck", "stopped"}:
+        # These are outcomes of the agent policy, not infrastructure failures.
+        # The caller must still verify the current patch and retain the run.
+        return True, f"agent_{status_name}"
+    if status_name == "error":
+        raise RuntimeError("OpenHands ended with status error")
+    return previously_finished, previous_reason
 
 
 def _dump(value: Any) -> dict[str, Any]:

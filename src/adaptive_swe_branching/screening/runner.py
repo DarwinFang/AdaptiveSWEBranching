@@ -415,7 +415,7 @@ class DifficultyScreeningRunner:
             verification = self.verifier.verify(task, final_patch)
             invalid_reason = verification.record.invalid_reason
             termination_reason = (
-                "agent_finished" if agent.finished else "absolute_step_cap"
+                agent.termination_reason if agent.finished else "absolute_step_cap"
             )
         except Exception as error:
             invalid_reason = _error_text(error)
