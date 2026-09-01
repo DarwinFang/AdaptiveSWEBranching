@@ -37,11 +37,18 @@ class SWESmithVerifier:
         self.timeout_seconds = timeout_seconds
         self.store = store
 
-    def verify(self, task: SWESmithTask, patch: str) -> Verification:
+    def verify(
+        self,
+        task: SWESmithTask,
+        patch: str,
+        *,
+        record_scope: str | None = None,
+    ) -> Verification:
         patch_hash = hashlib.sha256(patch.encode("utf-8")).hexdigest()
-        record_id = hashlib.sha256(
-            f"{task.record.task_id}\0{patch_hash}".encode()
-        ).hexdigest()
+        identity = f"{task.record.task_id}\0{patch_hash}"
+        if record_scope is not None:
+            identity += f"\0{record_scope}"
+        record_id = hashlib.sha256(identity.encode()).hexdigest()
         if self.store is not None:
             try:
                 cached = self.store.get("verifier", record_id)

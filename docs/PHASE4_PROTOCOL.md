@@ -68,6 +68,13 @@ outcomes. These trajectories are selection data only and cannot become shared-q
 labels or evaluation samples. Later continuation value remains a separate
 60-step quantity; a `q20` screening class is never reported as `q60`.
 
+Independent root runs may execute concurrently across the two frozen Qwen
+endpoints. Batches stop before the earliest point at which a class could become
+fixed: a fresh task launches four then two runs, while a task with three
+imported outcomes launches three. After six outcomes, any still-needed run is
+launched one at a time so concurrency never creates a known-redundant seventh
+or eighth run.
+
 The older six-run screen below remains historical pilot evidence only.
 
 The existing screen at

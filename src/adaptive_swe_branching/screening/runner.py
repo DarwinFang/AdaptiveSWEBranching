@@ -9,6 +9,7 @@ import subprocess
 import time
 import traceback
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -113,6 +114,20 @@ def order_screening_pool(
     return sorted(pool, key=lambda item: (rank.get(item[0], len(rank)),))
 
 
+def safe_parallel_batch_size(
+    *, observed_valid_runs: int, target_valid_runs: int, maximum_workers: int
+) -> int:
+    """Parallelize only runs that cannot yet make later launches redundant."""
+    if not 0 <= observed_valid_runs < target_valid_runs:
+        return 0
+    until_first_possible_resolution = max(1, 6 - observed_valid_runs)
+    return min(
+        maximum_workers,
+        target_valid_runs - observed_valid_runs,
+        until_first_possible_resolution,
+    )
+
+
 class DifficultyScreeningRunner:
     """Independent task stratification under the frozen 8-run rule."""
 
@@ -146,6 +161,15 @@ class DifficultyScreeningRunner:
             SCREEN_HARD: int(self.screen["quotas"][SCREEN_HARD]),
         }
         self.imported = self._load_imported_counts()
+        endpoints = self.screen.get("agent_base_urls") or [
+            self.agent_config["base_url"]
+        ]
+        self.agent_base_urls = tuple(str(value) for value in endpoints)
+        self.parallel_workers = int(
+            self.screen.get("parallel_root_runs", len(self.agent_base_urls))
+        )
+        if not 1 <= self.parallel_workers <= len(self.agent_base_urls):
+            raise ValueError("parallel_root_runs must fit configured agent_base_urls")
         self.dataset = SWESmithDataset(
             snapshot=Path(self.benchmark["dataset_path"]),
             revision=self.benchmark["version"],
@@ -352,7 +376,8 @@ class DifficultyScreeningRunner:
 
         accumulated = list(prior_runs)
         new_records: list[ScreeningRunRecord] = []
-        for attempt_index in range(self.maximum_attempts):
+        next_attempt = 0
+        while next_attempt < self.maximum_attempts:
             valid = [item for item in accumulated if not item["infrastructure_invalid"]]
             successes = imported_successes + sum(
                 item["outcome"] == Outcome.SOLVED.value for item in valid
@@ -364,19 +389,42 @@ class DifficultyScreeningRunner:
             )
             if resolved_class is not None:
                 break
-            if any(int(item["attempt_index"]) == attempt_index for item in accumulated):
-                continue
-            record = self._run_once(
-                task=task,
-                sample_index=sample_index,
-                attempt_index=attempt_index,
+            used_attempts = {int(item["attempt_index"]) for item in accumulated}
+            while next_attempt in used_attempts:
+                next_attempt += 1
+            if next_attempt >= self.maximum_attempts:
+                break
+            batch_size = safe_parallel_batch_size(
+                observed_valid_runs=imported_valid_runs + len(valid),
+                target_valid_runs=self.target_valid,
+                maximum_workers=self.parallel_workers,
             )
-            accumulated.append(record.to_dict())
-            new_records.append(record)
-            self._write_progress(
-                self._load_records("screening_tasks"),
-                self._load_records("screening_runs"),
-            )
+            attempts = []
+            while len(attempts) < batch_size and next_attempt < self.maximum_attempts:
+                if next_attempt not in used_attempts:
+                    attempts.append(next_attempt)
+                next_attempt += 1
+            with ThreadPoolExecutor(max_workers=len(attempts)) as executor:
+                futures = {
+                    executor.submit(
+                        self._run_once,
+                        task=task,
+                        sample_index=sample_index,
+                        attempt_index=attempt_index,
+                        agent_base_url=self.agent_base_urls[
+                            attempt_index % len(self.agent_base_urls)
+                        ],
+                    ): attempt_index
+                    for attempt_index in attempts
+                }
+                for future in as_completed(futures):
+                    record = future.result()
+                    accumulated.append(record.to_dict())
+                    new_records.append(record)
+                    self._write_progress(
+                        self._load_records("screening_tasks"),
+                        self._load_records("screening_runs"),
+                    )
 
         valid = [item for item in accumulated if not item["infrastructure_invalid"]]
         all_ids = tuple(item["screen_run_id"] for item in accumulated)
@@ -443,6 +491,7 @@ class DifficultyScreeningRunner:
         task: SWESmithTask,
         sample_index: int,
         attempt_index: int,
+        agent_base_url: str,
     ) -> ScreeningRunRecord:
         seed = derive_seed(
             self.root_seed,
@@ -494,7 +543,9 @@ class DifficultyScreeningRunner:
                 container_root=task.record.container_workdir,
                 platform=task.record.platform,
             )
-            agent = OpenHandsSession.from_config(self.agent_config, seed=seed)
+            agent_config = dict(self.agent_config)
+            agent_config["base_url"] = agent_base_url
+            agent = OpenHandsSession.from_config(agent_config, seed=seed)
             container.start()
             agent.start(task.record, container)
             for _ in range(int(self.screen["safety_cap_steps"])):
@@ -502,7 +553,9 @@ class DifficultyScreeningRunner:
                 if result.finished:
                     break
             _, final_patch, _, _ = git_state(workspace)
-            verification = self.verifier.verify(task, final_patch)
+            verification = self.verifier.verify(
+                task, final_patch, record_scope=run_id
+            )
             invalid_reason = verification.record.invalid_reason
             termination_reason = (
                 agent.termination_reason if agent.finished else "absolute_step_cap"

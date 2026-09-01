@@ -13,6 +13,12 @@ screening:
   screen_version: difficulty_screen_v2_20step
   sampling: compatible_legacy_tasks_first_then_fixed_seed_without_replacement
   initial_counts_path: configs/screening/legacy_source20_120.json
+  parallel_root_runs: 4
+  agent_base_urls:
+    - http://127.0.0.1:11436
+    - http://127.0.0.1:11436
+    - http://127.0.0.1:11437
+    - http://127.0.0.1:11437
   valid_runs_per_task: 8
   early_stop_when_class_mathematically_resolved: true
   maximum_total_attempts_per_task: 12

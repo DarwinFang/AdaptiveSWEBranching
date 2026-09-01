@@ -12,6 +12,7 @@ from adaptive_swe_branching.screening.runner import (
     order_screening_pool,
     quotas_satisfied,
     resolved_difficulty_class,
+    safe_parallel_batch_size,
     selected_cohort,
 )
 
@@ -60,6 +61,20 @@ def test_compatible_imported_tasks_are_screened_first() -> None:
     }
     ordered = order_screening_pool(pool, root_seed=7, imported=imported)
     assert [task_id for task_id, _ in ordered[:2]] == ["old-medium", "old-hard"]
+
+
+@pytest.mark.parametrize(
+    ("observed", "workers", "expected"),
+    [(0, 4, 4), (3, 4, 3), (5, 4, 1), (6, 4, 1), (7, 4, 1)],
+)
+def test_parallel_batches_never_launch_past_first_possible_decision(
+    observed, workers, expected
+) -> None:
+    assert safe_parallel_batch_size(
+        observed_valid_runs=observed,
+        target_valid_runs=8,
+        maximum_workers=workers,
+    ) == expected
 
 
 def test_all_three_quotas_must_be_reached() -> None:
