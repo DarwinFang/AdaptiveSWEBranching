@@ -8,7 +8,7 @@ from adaptive_swe_branching.oracle.records import (
     ChildFutures,
     CounterfactualExperiment,
 )
-from adaptive_swe_branching.oracle.utility import OutcomeUtility
+from adaptive_swe_branching.oracle.utility import OutcomeUtility, cost_value
 
 
 @dataclass(frozen=True)
@@ -38,15 +38,20 @@ class OracleB:
     cost. Failure/failure cost is deliberately absent from the key.
     """
 
-    @staticmethod
-    def rank(children: tuple[ChildFutures, ...]) -> tuple[OracleBRank, ...]:
+    def __init__(self, *, success_cost_axis: str = "total_tokens") -> None:
+        self.success_cost_axis = success_cost_axis
+
+    def rank(self, children: tuple[ChildFutures, ...]) -> tuple[OracleBRank, ...]:
         ranks = []
         for child in children:
             successes = [
                 sample for sample in child.samples if sample.outcome == Outcome.SOLVED
             ]
             mean_cost = (
-                sum(sample.cost_from_state.total_tokens for sample in successes)
+                sum(
+                    cost_value(sample.cost_from_state, self.success_cost_axis)
+                    for sample in successes
+                )
                 / len(successes)
                 if successes
                 else None

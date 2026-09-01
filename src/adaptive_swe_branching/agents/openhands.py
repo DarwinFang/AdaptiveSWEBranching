@@ -5,6 +5,7 @@ import copy
 import inspect
 import pickle
 import re
+import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -169,6 +170,7 @@ class OpenHandsSession:
             return StepResult(None, Cost(), True, self._final_answer)
         start = len(self._conversation.state.events)
         usage_before = self._usage()
+        started = time.monotonic()
         result = self._conversation.run()
         if inspect.isawaitable(result):
             asyncio.run(_await(result))
@@ -190,6 +192,7 @@ class OpenHandsSession:
             output_tokens=max(usage_after[1] - usage_before[1], 0),
             model_calls=max(usage_after[2] - usage_before[2], 1),
             tool_calls=1 if observation else 0,
+            wall_clock_seconds=time.monotonic() - started,
         )
         reasoning = _action_reasoning(action)
         action_text = _action_text(action)

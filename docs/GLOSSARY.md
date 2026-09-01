@@ -21,7 +21,8 @@ downstream outcome supervision.
 counterfactuals under a named utility.
 
 **Oracle B** — chooses among children using their measured downstream outcome
-distributions.
+distributions. Its success-cost tie-break axis is an explicit analysis setting
+(total tokens by default), never an unrecorded property of raw rollout data.
 
 **Proposer** — cheaply identifies candidate steps. A proposer never decides that
 branching is worthwhile.
@@ -37,4 +38,3 @@ Infrastructure failures are invalid, not negative labels.
 
 **Agent step** — one model response and its resulting tool action/observation.
 This definition is recorded in the experiment manifest.
-
