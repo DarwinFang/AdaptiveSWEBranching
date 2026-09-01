@@ -1,0 +1,18 @@
+include:
+  - ../agent/qwen3_coder_30b_openhands.yaml
+  - ../benchmark/swesmith_py.yaml
+
+experiment:
+  name: phase1_checkpoint_smoke
+  output_dir: /home/fangzhaohao/asb-runs/phase1_checkpoint_smoke
+  root_seed: 20260901
+
+smoke:
+  task_id: Suor__funcy.207a7810.combine_file__m9nft7o1
+  steps_before_checkpoint: 1
+  steps_after_restore: 1
+
+branching:
+  children: 4
+  local_span_steps: 4
+

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adaptive-swe-branching"
+version = "0.1.0"
+description = "Selective test-time branching for software-engineering agents"
+requires-python = ">=3.12"
+dependencies = [
+  "pyarrow>=18",
+  "PyYAML>=6",
+]
+
+[project.optional-dependencies]
+agent = ["openhands-sdk==1.21.0", "openhands-tools==1.21.0"]
+dev = ["pytest>=9", "ruff>=0.12"]
+
+[project.scripts]
+asb = "adaptive_swe_branching.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+

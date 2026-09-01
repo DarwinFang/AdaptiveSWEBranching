@@ -1,0 +1,11 @@
+swe_replay:
+  trials: 10
+  explore_probability: 0.5
+  filter_regression_failures: true
+  abstract_state: explored_repository_files_before_step
+  state_sampling: softmax_inverse_frequency
+  step_sampling: softmax_reasoning_paragraphs
+  non_repo_restore: action_replay
+  repo_only_restore: accumulated_git_diff
+  final_selection: regression_filter_then_exact_patch_majority
+

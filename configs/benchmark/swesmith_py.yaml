@@ -1,0 +1,14 @@
+benchmark:
+  name: swe_smith_py
+  version: 77cab9055d42ab4a5c25c89a8f937096db13558e
+  split: train
+  dataset_path: /home/fangzhaohao/smc4swe/data/hf_snapshots/X__SWE-bench__SWE-smith-py
+  dataset_manifest: /home/fangzhaohao/smc4swe/data/dataset_manifests/X.swe-smith-py.manifest.json
+  split_manifest: /home/fangzhaohao/smc4swe/configs/splits/swesmith_py_80_10_10_seed20260722.json
+  harness_path: /home/fangzhaohao/smc4swe/data/evaluation_harness/SWE-smith
+  harness_commit: 9b74ac08118a85c39c356802f7961893af73e07f
+  workspace_cache: /home/fangzhaohao/recov-runs/workspace_cache
+  container_workdir: /testbed
+  platform: linux/amd64
+  verifier_timeout_seconds: 3600
+
