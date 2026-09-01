@@ -108,10 +108,21 @@ class WorkspaceCache:
         template = self._template(task.record.task_id)
         if not template.exists():
             self._materialise(task, template)
+        resolved = self.resolve(task)
         copy_workspace(template, destination)
-        head = run_git(destination, "rev-parse", "HEAD").strip()
+        return resolved
+
+    def resolve(self, task: SWESmithTask) -> SWESmithTask:
+        template = self._template(task.record.task_id)
+        if not template.exists():
+            self._materialise(task, template)
+        head = run_git(template, "rev-parse", "HEAD").strip()
         record = TaskRecord(**{**task.record.to_dict(), "base_commit": head})
-        return SWESmithTask(record=record, row=task.row, verifier_row=task.verifier_row)
+        return SWESmithTask(
+            record=record,
+            row=task.row,
+            verifier_row=task.verifier_row,
+        )
 
     def _materialise(self, task: SWESmithTask, template: Path) -> None:
         if template.exists():

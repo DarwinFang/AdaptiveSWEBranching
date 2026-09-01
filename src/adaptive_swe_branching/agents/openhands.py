@@ -90,6 +90,14 @@ class OpenHandsSession:
     def finished(self) -> bool:
         return self._finished
 
+    @property
+    def steps(self) -> tuple[StepRecord, ...]:
+        return tuple(self._steps)
+
+    @property
+    def final_answer(self) -> str | None:
+        return self._final_answer
+
     def _build(self) -> None:
         from openhands.sdk import LLM, Agent, LocalConversation, Tool
 

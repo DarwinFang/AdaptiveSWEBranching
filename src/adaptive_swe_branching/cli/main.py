@@ -32,12 +32,18 @@ def main() -> None:
     )
     smoke.add_argument("--config", required=True)
     smoke.add_argument("--steps", type=int, default=1)
+    replay = subcommands.add_parser(
+        "smoke-swe-replay", help="two-trial bounded faithful SWE-Replay smoke"
+    )
+    replay.add_argument("--config", required=True)
     arguments = parser.parse_args()
     config = load_config(arguments.config)
     if arguments.command == "doctor":
         report = doctor_report(config)
-    else:
+    elif arguments.command == "smoke-checkpoint":
         report = checkpoint_smoke(config, steps=arguments.steps)
+    else:
+        report = swe_replay_smoke(config)
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
@@ -200,6 +206,97 @@ def checkpoint_smoke(config: dict[str, Any], *, steps: int) -> dict[str, Any]:
         "workspace_hash": restored_record.workspace_hash,
         "restored": True,
         "continued_one_step": continued is not None,
+        "output_dir": str(output),
+    }
+
+
+def swe_replay_smoke(config: dict[str, Any]) -> dict[str, Any]:
+    from dataclasses import asdict
+
+    from adaptive_swe_branching.baselines.swe_replay.openhands_backend import (
+        OpenHandsReplayBackend,
+    )
+    from adaptive_swe_branching.baselines.swe_replay.runner import SWEReplayRunner
+    from adaptive_swe_branching.environments.verifier import SWESmithVerifier
+
+    doctor = doctor_report(config)
+    benchmark = config["benchmark"]
+    experiment = config["experiment"]
+    smoke = config["smoke"]
+    output = Path(experiment["output_dir"]).expanduser().resolve()
+    if output.exists():
+        raise FileExistsError(f"smoke output is immutable and already exists: {output}")
+    root_seed = int(experiment["root_seed"])
+    dataset = SWESmithDataset(
+        snapshot=Path(benchmark["dataset_path"]),
+        revision=benchmark["version"],
+        split_manifest=Path(benchmark["split_manifest"]),
+        container_workdir=benchmark["container_workdir"],
+        platform=benchmark["platform"],
+    )
+    cache = WorkspaceCache(Path(benchmark["workspace_cache"]))
+    task = cache.resolve(dataset.load(smoke["task_id"]))
+    raw = RawStore(output / "raw")
+    raw.initialise(
+        ExperimentManifest.create(
+            experiment_name=experiment["name"],
+            git_commit=_git_commit(Path.cwd()),
+            config=config,
+            root_seed=root_seed,
+            external_resources=doctor,
+        )
+    )
+    raw.put("task", task.record.task_id, task.record)
+    checkpoints = CheckpointStore(output / "checkpoints", raw)
+    verifier = SWESmithVerifier(
+        harness_path=Path(benchmark["harness_path"]),
+        timeout_seconds=float(benchmark["verifier_timeout_seconds"]),
+        store=raw,
+    )
+    backend = OpenHandsReplayBackend(
+        task=task,
+        workspace_cache=cache,
+        checkpoint_store=checkpoints,
+        raw_store=raw,
+        verifier=verifier,
+        agent_factory=lambda seed: _agent(config["agent"], seed),
+        run_root=output,
+        max_steps=int(smoke["max_steps"]),
+    )
+    result = SWEReplayRunner(
+        trials=int(smoke["trials"]),
+        explore_probability=float(config["swe_replay"]["explore_probability"]),
+        max_steps=int(smoke["max_steps"]),
+        root_seed=root_seed,
+        backend=backend,
+    ).run()
+    run_id = stable_sha256(
+        {"task": task.record.task_id, "experiment": experiment["name"]}
+    )
+    raw.put(
+        "swe_replay_run",
+        run_id,
+        {
+            "run_id": run_id,
+            "task_id": task.record.task_id,
+            "trials": [asdict(trial) for trial in result.trials],
+            "archive_trajectory_ids": [
+                item.trajectory.trajectory_id for item in result.archive
+            ],
+            "selected_trajectory_id": result.selected_trajectory_id,
+            "selected_patch_sha256": stable_sha256(result.selected_patch),
+            "majority_tied": result.majority_tied,
+            "generation_costs": [
+                item.generation_cost.to_dict() for item in result.archive
+            ],
+        },
+    )
+    return {
+        "ok": True,
+        "task_id": task.record.task_id,
+        "trials": [trial.mode for trial in result.trials],
+        "selected_trajectory_id": result.selected_trajectory_id,
+        "majority_tied": result.majority_tied,
         "output_dir": str(output),
     }
 

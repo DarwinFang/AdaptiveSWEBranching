@@ -129,3 +129,10 @@ Ollama call:
 ```bash
 asb smoke-checkpoint --config configs/experiments/phase1_smoke.yaml --steps 1
 ```
+
+The bounded Phase-2 baseline smoke uses two one-step trials (one explore and
+one paper-defined replay attempt):
+
+```bash
+asb smoke-swe-replay --config configs/experiments/swe_replay_smoke.yaml
+```

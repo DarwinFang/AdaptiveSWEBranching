@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from adaptive_swe_branching.data.records import TrajectoryRecord
+from adaptive_swe_branching.data.records import Cost, TrajectoryRecord
 
 
 @dataclass(frozen=True)
@@ -11,6 +11,7 @@ class ArchivedTrajectory:
     regression_passed: bool
     pre_step_checkpoint_ids: tuple[str, ...]
     accumulated_patches_before_step: tuple[str, ...]
+    generation_cost: Cost = field(default_factory=Cost)
 
     def __post_init__(self) -> None:
         size = len(self.trajectory.steps)

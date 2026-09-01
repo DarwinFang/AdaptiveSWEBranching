@@ -141,36 +141,64 @@ class CheckpointStore:
         )
         container.start()
         try:
-            agent.attach(task, container)
-            snapshot = _snapshot_from_json(source / "agent_snapshot.json")
-            agent.restore(source / record.scaffold_state_ref, snapshot)
-            head, diff, status, _ = git_state(destination)
-            current_fingerprint = stable_sha256(
-                {
-                    "task_id": task.task_id,
-                    "step": record.absolute_step,
-                    "workspace_hash": workspace_hash(destination),
-                    "history_hash": snapshot.history_hash,
-                    "model_input_hash": snapshot.model_input_hash,
-                    "image_digest": task.image_digest,
-                    "scaffold_fingerprint": agent.fingerprint,
-                }
+            self.restore_prepared(
+                checkpoint_id=checkpoint_id,
+                task=task,
+                workspace=destination,
+                container=container,
+                agent=agent,
             )
-            checks = {
-                "base_commit": head == record.base_commit,
-                "git_diff": diff == record.git_diff,
-                "git_status": status == record.git_status,
-                "restore_fingerprint": current_fingerprint
-                == record.restore_fingerprint,
-            }
-            if not all(checks.values()):
-                raise RuntimeError(f"checkpoint restore audit failed: {checks}")
         except Exception:
             agent.close()
             container.stop()
             shutil.rmtree(destination, ignore_errors=True)
             raise
         return record, container
+
+    def restore_prepared(
+        self,
+        *,
+        checkpoint_id: str,
+        task: TaskRecord,
+        workspace: Path,
+        container: DockerContainer,
+        agent: AgentSession,
+    ) -> CheckpointRecord:
+        """Attach saved scaffold history to an independently reconstructed state."""
+        record = self.load(checkpoint_id)
+        if task.task_id != record.task_id or task.image_digest != record.image_digest:
+            raise ValueError("prepared restore identity differs from checkpoint")
+        if not container.started or container.workspace != workspace.resolve():
+            raise RuntimeError(
+                "prepared workspace must be mounted in the live container"
+            )
+        if workspace_hash(workspace) != record.workspace_hash:
+            raise RuntimeError("prepared workspace bytes do not match checkpoint")
+        source = self.root / checkpoint_id
+        snapshot = _snapshot_from_json(source / "agent_snapshot.json")
+        agent.attach(task, container)
+        agent.restore(source / record.scaffold_state_ref, snapshot)
+        head, diff, status, _ = git_state(workspace)
+        current_fingerprint = stable_sha256(
+            {
+                "task_id": task.task_id,
+                "step": record.absolute_step,
+                "workspace_hash": workspace_hash(workspace),
+                "history_hash": snapshot.history_hash,
+                "model_input_hash": snapshot.model_input_hash,
+                "image_digest": task.image_digest,
+                "scaffold_fingerprint": agent.fingerprint,
+            }
+        )
+        checks = {
+            "base_commit": head == record.base_commit,
+            "git_diff": diff == record.git_diff,
+            "git_status": status == record.git_status,
+            "restore_fingerprint": current_fingerprint == record.restore_fingerprint,
+        }
+        if not all(checks.values()):
+            raise RuntimeError(f"checkpoint restore audit failed: {checks}")
+        return record
 
 
 def _snapshot_from_json(path: Path) -> AgentSnapshot:

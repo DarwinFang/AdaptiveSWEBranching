@@ -75,6 +75,7 @@ class RawStore:
         "continuation": "continuations",
         "counterfactual_group": "counterfactual_groups",
         "verifier": "verifier_records",
+        "swe_replay_run": "swe_replay_runs",
     }
 
     def __init__(self, root: str | Path):

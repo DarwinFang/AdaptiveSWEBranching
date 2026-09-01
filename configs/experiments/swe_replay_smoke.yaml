@@ -1,0 +1,14 @@
+include:
+  - ../agent/qwen3_coder_30b_openhands.yaml
+  - ../benchmark/swesmith_py.yaml
+  - ../baselines/swe_replay.yaml
+
+experiment:
+  name: phase2_swe_replay_smoke
+  output_dir: /home/fangzhaohao/asb-runs/phase2_swe_replay_smoke
+  root_seed: 20260901
+
+smoke:
+  task_id: Suor__funcy.207a7810.combine_file__m9nft7o1
+  trials: 2
+  max_steps: 1
