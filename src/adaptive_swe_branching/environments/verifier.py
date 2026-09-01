@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -73,7 +74,7 @@ class SWESmithVerifier:
             )
             run_id = f"asb-{uuid.uuid4().hex[:12]}"
             command = [
-                "python",
+                sys.executable,
                 "-m",
                 "swesmith.harness.eval",
                 "--dataset_path",
