@@ -2,6 +2,7 @@ from .records import (
     BranchGroupRecord,
     CheckpointRecord,
     ChildBranchRecord,
+    ChildQAuditGroupRecord,
     ContinuationRecord,
     Cost,
     CounterfactualGroupRecord,
@@ -17,6 +18,7 @@ from .store import ExperimentManifest, RawStore
 __all__ = [
     "BranchGroupRecord",
     "CheckpointRecord",
+    "ChildQAuditGroupRecord",
     "ChildBranchRecord",
     "ContinuationRecord",
     "Cost",

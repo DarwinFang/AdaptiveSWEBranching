@@ -23,6 +23,7 @@ def continuation(
     outcome: Outcome,
     *,
     step_count: int = 6,
+    cap_hit: bool = False,
 ) -> tuple[ContinuationRecord, ContinuationEvidence]:
     trajectory = make_trajectory(
         identity,
@@ -43,6 +44,7 @@ def continuation(
         cost_from_source=Cost(input_tokens=1),
         final_patch="",
         termination_reason="finish",
+        cap_hit=cap_hit,
         post_parent_step_count=step_count,
         prefix_checkpoint_ids_by_depth={
             depth: f"cp-{identity}-{depth}"
@@ -77,6 +79,27 @@ def test_targets_support_variable_k_and_exclude_invalid() -> None:
     target = parent_q_target("parent", (solved, failed, invalid))
     assert target.trials == 2
     assert target.invalid_continuation_ids == ("cont-c",)
+
+
+def test_parent_minimum_k_and_cap_sensitivity_are_explicit() -> None:
+    records = tuple(
+        continuation(
+            str(index),
+            Outcome.UNSOLVED if index == 0 else Outcome.SOLVED,
+            cap_hit=index == 0,
+        )[0]
+        for index in range(6)
+    )
+    assert parent_q_target("parent", records, minimum_valid_k=6).trials == 6
+    with pytest.raises(ValueError, match="at least 6 valid"):
+        parent_q_target(
+            "parent", records, minimum_valid_k=6, exclude_cap_hits=True
+        )
+    sensitivity = parent_q_target(
+        "parent", records, minimum_valid_k=5, exclude_cap_hits=True
+    )
+    assert sensitivity.trials == 5
+    assert sensitivity.excluded_cap_hit_continuation_ids == ("cont-0",)
 
 
 def test_prefix_target_requires_saved_executable_state() -> None:

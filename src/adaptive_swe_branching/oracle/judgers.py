@@ -17,10 +17,11 @@ class OracleAMeasurement:
     success_rate: float
     branchability: float
     invalid_trajectory_ids: tuple[str, ...]
+    excluded_cap_hit_trajectory_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True)
-class OracleBRank:
+class TrajectoryOutcomeRank:
     trajectory_id: str
     outcome: Outcome
 
@@ -28,12 +29,27 @@ class OracleBRank:
 class OracleA:
     """Measure whether same-parent futures straddle the outcome boundary."""
 
+    def __init__(self, *, minimum_valid_k: int = 1) -> None:
+        if minimum_valid_k < 1:
+            raise ValueError("minimum valid K must be positive")
+        self.minimum_valid_k = minimum_valid_k
+
     def measure(
-        self, experiment: ParentContinuationExperiment
+        self,
+        experiment: ParentContinuationExperiment,
+        *,
+        exclude_cap_hits: bool = False,
     ) -> OracleAMeasurement:
-        valid = experiment.valid_samples
-        if not valid:
-            raise ValueError("Oracle A needs at least one valid continuation")
+        valid = tuple(
+            sample
+            for sample in experiment.valid_samples
+            if not (exclude_cap_hits and sample.cap_hit)
+        )
+        if len(valid) < self.minimum_valid_k:
+            raise ValueError(
+                f"Oracle A needs at least {self.minimum_valid_k} valid "
+                f"continuations; found {len(valid)}"
+            )
         successes = sum(sample.outcome == Outcome.SOLVED for sample in valid)
         success_rate = successes / len(valid)
         return OracleAMeasurement(
@@ -46,6 +62,11 @@ class OracleA:
                 sample.trajectory_id
                 for sample in experiment.samples
                 if sample.outcome == Outcome.INVALID
+            ),
+            excluded_cap_hit_trajectory_ids=tuple(
+                sample.trajectory_id
+                for sample in experiment.valid_samples
+                if exclude_cap_hits and sample.cap_hit
             ),
         )
 
@@ -60,7 +81,7 @@ class OracleA:
         return self.measure(experiment).branchability >= threshold
 
 
-class OracleB:
+class TrajectoryOutcomeOracle:
     """Clairvoyant upper bound using each sampled sibling's realized outcome.
 
     This is not an estimate of a child's true q: one non-nested continuation
@@ -68,14 +89,18 @@ class OracleB:
     q(state) model used by A to each child checkpoint and selects the largest q.
     """
 
-    def rank(self, samples: tuple[FutureSample, ...]) -> tuple[OracleBRank, ...]:
+    def rank(
+        self, samples: tuple[FutureSample, ...]
+    ) -> tuple[TrajectoryOutcomeRank, ...]:
         valid = tuple(
             sample for sample in samples if sample.outcome != Outcome.INVALID
         )
         if not valid:
-            raise ValueError("Oracle B needs at least one valid sibling")
+            raise ValueError(
+                "Trajectory-Outcome Oracle needs at least one valid sibling"
+            )
         ranks = tuple(
-            OracleBRank(
+            TrajectoryOutcomeRank(
                 trajectory_id=sample.trajectory_id,
                 outcome=sample.outcome,
             )

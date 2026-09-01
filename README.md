@@ -62,7 +62,7 @@ vector costs remain the source of truth, so labels can be recomputed offline.
 Before training the shared model, the same-parent continuation pool must support:
 
 - **Oracle A:** compute `4 q(s) (1 - q(s))` and sweep gate thresholds;
-- **Realized-outcome Oracle B:** truncate full continuations at configurable
+- **Trajectory-Outcome Oracle:** truncate full continuations at configurable
   prefix depth `d`, then use their known terminal outcomes as a clairvoyant
   upper bound. Without nested rollout it is not an exact measurement of each
   child's latent `q`;
@@ -73,6 +73,13 @@ Phase 4 uses `K=8` only as a sampling budget, not as part of the method
 definition. The raw schema and label construction support variable valid `K`.
 Online simulation uses `N=4` as the primary setting, `N=2` as a lower-cost
 setting, and derives `d in {1, 2, 4, 6}` from the same full continuations.
+
+The primary one-layer experiment is accompanied by a separate, small Child-q
+audit. It repeats futures from a limited number of depth-6 child checkpoints to
+test whether high parent uncertainty actually produces useful true child-value
+spread. This audit is not part of the primary rollout tree or training set.
+Its frozen protocol is in
+[`docs/CHILD_Q_AUDIT.md`](docs/CHILD_Q_AUDIT.md).
 
 Phase 4 is blocked until Oracle selective branching improves the solve-rate /
 compute frontier on a small gate. This repository currently implements Phases

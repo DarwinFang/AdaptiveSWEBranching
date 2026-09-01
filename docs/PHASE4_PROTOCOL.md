@@ -11,6 +11,12 @@ times and run `K` complete independent continuations. Phase 4 normally requests
 `K=8`, while the schema and label code accept a variable number of valid runs.
 No short child checkpoint receives another set of downstream rollouts.
 
+Eight valid continuations are the target. Infrastructure-invalid attempts are
+kept as raw records and retried with new deterministic seeds, up to 12 total
+attempts per parent. A parent with 8 valid runs is complete; 6 or 7 is accepted
+with its actual `K_valid`; fewer than 6 is excluded from formal parent/Oracle-A
+analysis while all raw attempts remain available.
+
 Every continuation preserves the complete post-parent action/observation
 history, terminal verifier outcome, post-parent steps and vector cost, final
 patch and termination reason. Raw continuations are immutable source data.
@@ -69,26 +75,44 @@ never by subjective inspection.
 ## Fresh source trajectories and parents
 
 After at least 12 medium tasks exist, run one fresh source trajectory for each
-selected task. Choose four nonterminal parents per task:
+selected task. Remove the initial and terminal states, order the remaining
+checkpoints by trajectory position, and split the sequence into three contiguous
+chunks whose sizes differ by at most one. This is relative progress, not fixed
+absolute step ranges. Then choose four nonterminal parents per task:
 
 1. one uniformly sampled from the early third of eligible checkpoint ranks;
 2. one from the middle third;
 3. one from the late third;
 4. one proposed by the faithful SWE-Replay critical-step selector.
 
-Every parent records `candidate_source` as `random` or `swe_replay`. Duplicate
-absolute steps are removed. The planned replacement rule is in the manifest and
-is explicitly a reviewable interpretation, not a fact supplied by the paper.
+Every parent records all `candidate_sources`. If SWE-Replay selects a random
+parent, that state is rolled out only once and keeps both provenance values,
+such as `random_middle` and `swe_replay`. A fixed-seed replacement is first drawn
+from the overlapped stratum, then from all remaining eligible checkpoints if the
+stratum is empty. Each task therefore retains four unique parents.
+
+## Termination and cap hits
+
+The deployment protocol remains Qwen3-Coder + OpenHands + verifier with a
+60-agent-step operational safety cap. A cap hit is explicitly recorded and is
+counted as unsolved in the main analysis. A pre-specified sensitivity analysis
+recomputes results after excluding cap-hit continuations. If the cap-hit rate
+exceeds 5%, the adequacy of the 60-step protocol is reviewed before later phases.
 
 ## Counts before rollout
 
-| Medium tasks | Fresh sources | Parents (4/task) | Full continuations (8/parent) | Grouped parent q targets | Maximum prefix Bernoulli q targets |
+| Medium tasks | Fresh sources | Parents (4/task) | Target-valid continuations (8/parent) | Grouped parent q targets | Maximum prefix Bernoulli q targets |
 |---:|---:|---:|---:|---:|---:|
 | 12 | 12 | 48 | 384 | 48 | 1,536 |
 | 20 | 20 | 80 | 640 | 80 | 2,560 |
 
 The prefix maximum is `parents × 8 continuations × 4 depths`. Invalid or
 too-short continuations reduce the actual number.
+
+The target-valid totals are 384 and 640. With at most 12 total attempts per
+parent, the corresponding hard attempt caps are 576 and 960. Compute proxies
+below describe target-valid runs and do not silently assume that retries are
+free.
 
 The completed root screen provides only a conservative compute proxy because a
 post-parent continuation is normally shorter than a full root run. Across its
@@ -109,14 +133,13 @@ tasks, but that is a planning heuristic, not a sampling guarantee.
 ## Oracle and matched compute
 
 Oracle A sweeps thresholds over observed parent `4 q(1-q)` values. `0.75` is
-only a diagnostic operating point. For the Phase-4 upper bound, realized-outcome
-Oracle B selects a successful sampled sibling when one is visible in the frozen
-full continuations. Primary `N=4`; secondary `N=2`.
+only a diagnostic operating point. For the Phase-4 upper bound, the
+**Trajectory-Outcome Oracle** selects a successful sampled sibling when one is
+visible in the frozen full continuations. Primary `N=4`; secondary `N=2`.
 
-This Oracle B is deliberately named precisely: without nested repeats from each
-child state, it knows a realized terminal outcome, not the child's true latent
-success probability. The later learned B uses predicted `q(child)` and is the
-actual deployable rule.
+This is deliberately not called a true-value or Child-q Oracle: it knows a
+realized terminal outcome, not the child's latent success probability. The later
+learned B uses predicted `q(child)` and is the actual deployable rule.
 
 The simulator charges the selected full continuation plus the observed prefix
 cost of every discarded sibling. It reports solve rate against total input plus
@@ -124,15 +147,25 @@ output tokens as the primary frontier, with model calls, steps and additive
 worker wall-clock as secondary axes. Normalized budgets are `1x`, `1.5x`, `2x`
 and `4x`, where `1x` is one ordinary single-chain protocol.
 
-## Items that must be frozen at review
+## Separate Child-q audit
 
-1. Minimum acceptable valid `K` after infrastructure-invalid runs.
-2. Whether rank thirds over all nonterminal recorded checkpoints is the desired
-   exact interpretation of broad early/middle/late regions.
-3. Whether the duplicate replacement and parent-shortfall rules in the
-   manifest are acceptable.
-4. Whether the 60-step operational safety cap remains the normal full-run
-   protocol for this pilot.
+The primary dataset remains single-layer. After it finishes, a separately
+manifested audit samples 12 (allowed range 10–20) formal parents with empirical
+branchability at least 0.75. For each parent it samples four already-saved
+depth-6 child checkpoints, then requests eight valid independent continuations
+from every child, again requiring at least six.
+
+The primary audit statistic is:
+
+```text
+max_j q(child_j) - mean_j q(child_j)
+```
+
+It also reports range, standard deviation, parent-uncertainty association, and
+the agreement/regret between the Trajectory-Outcome Oracle and an empirical
+Child-q Oracle. At 12 parents this adds 48 child states and 384 target-valid
+nested continuations (at most 576 attempts under the retry cap). These records
+are not used for the primary shared-q training set.
 
 No learned value-model training begins in Phase 4. If the medium-only Oracle
 gate is positive, the later shared model's training set must add easy and hard

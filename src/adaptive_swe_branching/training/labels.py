@@ -45,6 +45,7 @@ class SuccessProbabilityTarget:
     prefix_depth: int | None = None
     continuation_id: str | None = None
     invalid_continuation_ids: tuple[str, ...] = ()
+    excluded_cap_hit_continuation_ids: tuple[str, ...] = ()
 
 
 def branchability_from_q(q: float) -> float:
@@ -57,17 +58,39 @@ def branchability_from_q(q: float) -> float:
 def parent_q_target(
     parent_checkpoint_id: str,
     continuations: tuple[ContinuationRecord, ...],
+    *,
+    minimum_valid_k: int = 1,
+    exclude_cap_hits: bool = False,
 ) -> SuccessProbabilityTarget:
-    """Aggregate repeated same-parent futures into one binomial q target."""
+    """Aggregate same-parent futures into one binomial q target.
+
+    Main protocol counts a 60-step cap hit as unsolved. Setting
+    ``exclude_cap_hits`` creates the pre-specified sensitivity analysis.
+    """
+    if minimum_valid_k < 1:
+        raise ValueError("minimum valid K must be positive")
     _require_same_parent(parent_checkpoint_id, continuations)
-    valid = [item for item in continuations if item.outcome != Outcome.INVALID]
+    valid = [
+        item
+        for item in continuations
+        if item.outcome != Outcome.INVALID
+        and not (exclude_cap_hits and item.cap_hit)
+    ]
     invalid = tuple(
         item.continuation_id
         for item in continuations
         if item.outcome == Outcome.INVALID
     )
-    if not valid:
-        raise ValueError("parent q target needs at least one valid continuation")
+    excluded_cap_hits = tuple(
+        item.continuation_id
+        for item in continuations
+        if exclude_cap_hits and item.cap_hit and item.outcome != Outcome.INVALID
+    )
+    if len(valid) < minimum_valid_k:
+        raise ValueError(
+            f"parent q target needs at least {minimum_valid_k} valid "
+            f"continuations; found {len(valid)}"
+        )
     successes = sum(item.outcome == Outcome.SOLVED for item in valid)
     return SuccessProbabilityTarget(
         state_id=parent_checkpoint_id,
@@ -77,6 +100,7 @@ def parent_q_target(
         trials=len(valid),
         empirical_q=successes / len(valid),
         invalid_continuation_ids=invalid,
+        excluded_cap_hit_continuation_ids=excluded_cap_hits,
     )
 
 
@@ -85,6 +109,7 @@ def prefix_q_targets(
     evidence: tuple[ContinuationEvidence, ...],
     *,
     depths: tuple[int, ...] = (1, 2, 4, 6),
+    exclude_cap_hits: bool = False,
 ) -> tuple[SuccessProbabilityTarget, ...]:
     """Create Bernoulli q targets for saved child states at each depth.
 
@@ -99,6 +124,8 @@ def prefix_q_targets(
     targets: list[SuccessProbabilityTarget] = []
     for item in evidence:
         if item.record.outcome == Outcome.INVALID:
+            continue
+        if exclude_cap_hits and item.record.cap_hit:
             continue
         step_count = len(item.post_parent_steps())
         for depth in depths:

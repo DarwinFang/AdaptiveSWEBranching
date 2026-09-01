@@ -1,8 +1,8 @@
 # Raw data schema
 
-Schema version `2` is intentionally event-oriented and label-agnostic. Version
-2 adds the single-layer parent-continuation group and explicit saved prefix
-checkpoint links required by the shared success-probability model.
+Schema version `3` is intentionally event-oriented and label-agnostic. Version
+3 records continuation retry provenance, explicit cap hits, multiple candidate
+sources for one deduplicated parent, and the separately scoped Child-q audit.
 
 ## Experiment manifest
 
@@ -33,8 +33,8 @@ fingerprint, cost to checkpoint, and paths to the workspace and scaffold state.
 ## ContinuationRecord and ParentContinuationGroupRecord
 
 This is the Phase-4 source of truth. For one parent checkpoint, a parent group
-links `K` independent full continuation records and records
-`candidate_source = random | swe_replay`. Each continuation stores its exact
+links `K` independent full continuation records and records all
+`candidate_sources`. Each continuation stores its exact
 source checkpoint, seed, full trajectory link, terminal outcome, post-parent
 vector cost, final patch and termination reason. The linked trajectory preserves
 every post-parent action/observation step.
@@ -43,6 +43,11 @@ every post-parent action/observation step.
 slice explicitly even if a storage backend later embeds it in a longer
 trajectory. Variable `K` is valid; invalid infrastructure continuations remain
 recorded but are excluded from `K_s` when labels are derived.
+
+`attempt_index` and `replacement_for_invalid_continuation_id` preserve every
+invalid attempt and its deterministic replacement. `cap_hit` is explicit: the
+main protocol counts it as unsolved, while sensitivity analysis can exclude it
+without guessing from free-form termination text.
 
 At each configured prefix depth, `prefix_checkpoint_ids_by_depth` links the
 actual saved executable child checkpoint. This is necessary because B must score
@@ -59,6 +64,18 @@ Both target types train the same `q(state)` model. A transforms the parent's
 prediction with `4 q(1-q)`; B selects the largest child prediction.
 
 No short child is rolled out another `K` times in the Phase-4 protocol.
+
+`ParentContinuationGroupRecord.candidate_sources` is a tuple because one unique
+parent can simultaneously have provenance such as `random_middle` and
+`swe_replay`. The group freezes target valid `K=8`, minimum formal `K=6`, and
+links every initial and replacement attempt.
+
+## ChildQAuditGroupRecord
+
+This record exists only under the small, separately manifested nested audit. It
+links one high-branchability parent, four depth-6 child checkpoints, and repeated
+continuations from each child. It must not be confused with or silently merged
+into the primary single-layer Phase-4 dataset.
 
 ## Generic online branch records
 

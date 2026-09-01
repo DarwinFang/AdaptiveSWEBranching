@@ -43,3 +43,25 @@ def test_phase4_manifest_freezes_single_shared_q_model() -> None:
     assert model["pairwise_head"] is False
     assert config["label_rollout"]["nested_child_downstream_rollouts"] is False
     assert config["inference_roles"]["judger_b"]["selection"] == "argmax_q_child"
+    assert config["label_rollout"]["target_valid_continuations_per_parent"] == 8
+    assert (
+        config["label_rollout"]["minimum_valid_continuations_for_formal_analysis"]
+        == 6
+    )
+    assert config["label_rollout"]["cap_hit"]["main_analysis_outcome"] == "unsolved"
+
+
+def test_child_q_audit_is_separate_and_bounded() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config = load_config(
+        project_root / "configs/experiments/phase4_child_q_audit.yaml"
+    )
+    assert config["experiment"]["status"] == "planned_not_launched"
+    assert config["experiment"]["separate_from_primary_phase4_dataset"] is True
+    assert config["children"] == {
+        "per_parent": 4,
+        "branch_span_steps": 6,
+        "source": "saved_prefix_checkpoints_from_distinct_primary_continuations",
+        "sampling": "fixed_seed_without_replacement",
+    }
+    assert config["child_q_rollout"]["target_valid_continuations_per_child"] == 8

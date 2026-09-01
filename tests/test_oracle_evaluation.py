@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from adaptive_swe_branching.data.records import Cost, Outcome, StepRecord
 from adaptive_swe_branching.evaluation.matched_compute import (
     MatchedComputeEvaluator,
@@ -11,7 +13,10 @@ from adaptive_swe_branching.evaluation.simulate import (
     random_branching,
     single_chain,
 )
-from adaptive_swe_branching.oracle.judgers import OracleA, OracleB
+from adaptive_swe_branching.oracle.judgers import (
+    OracleA,
+    TrajectoryOutcomeOracle,
+)
 from adaptive_swe_branching.oracle.records import (
     FutureSample,
     ParentContinuationExperiment,
@@ -38,6 +43,7 @@ def sample(
     tokens: int = 10,
     *,
     invalid: bool = False,
+    cap_hit: bool = False,
     step_tokens: tuple[int, ...] = (2, 3),
 ) -> FutureSample:
     outcome = Outcome.INVALID if invalid else (
@@ -51,11 +57,12 @@ def sample(
         final_patch="",
         termination_reason="finish",
         steps=tuple(step(index, cost) for index, cost in enumerate(step_tokens, 1)),
+        cap_hit=cap_hit,
     )
 
 
 def experiment(*samples: FutureSample) -> ParentContinuationExperiment:
-    return ParentContinuationExperiment("t", "p", "random", tuple(samples))
+    return ParentContinuationExperiment("t", "p", ("random",), tuple(samples))
 
 
 def test_oracle_a_measures_outcome_boundary_and_excludes_invalid() -> None:
@@ -75,13 +82,17 @@ def test_oracle_a_measures_outcome_boundary_and_excludes_invalid() -> None:
     )
 
 
-def test_realized_outcome_oracle_b_prefers_success() -> None:
+def test_trajectory_outcome_oracle_prefers_realized_success() -> None:
     fast_failure = sample("failure", False, 1)
     slow_success = sample("slow", True, 20)
     fast_success = sample("fast", True, 10)
-    selected = OracleB().select((fast_failure, slow_success, fast_success))
+    selected = TrajectoryOutcomeOracle().select(
+        (fast_failure, slow_success, fast_success)
+    )
     assert selected.trajectory_id == "fast"
-    tied_failures = OracleB().rank((sample("z", False), sample("a", False)))
+    tied_failures = TrajectoryOutcomeOracle().rank(
+        (sample("z", False), sample("a", False))
+    )
     assert [rank.trajectory_id for rank in tied_failures] == ["a", "z"]
 
 
@@ -113,6 +124,7 @@ def test_strategy_simulators_charge_all_purchased_compute() -> None:
         n=2,
         branch_span=1,
         seed=1,
+        minimum_valid_k=2,
     )
     assert oracle_trace.outcome == Outcome.SOLVED
     assert oracle_trace.total_cost.total_tokens == 22
@@ -126,6 +138,16 @@ def test_oracle_a_skips_branching_for_certain_parent() -> None:
         n=2,
         branch_span=1,
         seed=3,
+        minimum_valid_k=2,
     )
     assert trace.outcome == Outcome.SOLVED
     assert trace.total_cost.total_tokens in {10, 20}
+
+
+def test_oracle_a_enforces_minimum_k_and_supports_cap_hit_sensitivity() -> None:
+    parent = experiment(
+        sample("one", True),
+        sample("two", False, cap_hit=True),
+    )
+    with pytest.raises(ValueError, match="at least 2 valid"):
+        OracleA(minimum_valid_k=2).measure(parent, exclude_cap_hits=True)

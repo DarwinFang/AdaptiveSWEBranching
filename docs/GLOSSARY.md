@@ -29,10 +29,14 @@ inference rule, not a separate learned head.
 continuations. Its threshold is swept for analysis rather than frozen as a
 single method constant.
 
-**Realized-outcome Oracle B** — chooses a successful sibling when the frozen
+**Trajectory-Outcome Oracle** — chooses a successful sibling when the frozen
 sampled futures reveal one. It is a clairvoyant upper bound for that sample, not
 an exact estimate of a child's latent `q`; exact child `q` would require nested
 repeated continuations, which Phase 4 deliberately avoids.
+
+**Child-q Oracle** — available only in the small nested audit. It estimates each
+selected child's success probability from repeated continuations and chooses the
+largest empirical child `q`.
 
 **Full continuation** — one complete post-parent Agent run restored from the
 same executable checkpoint, including every step, final verifier result, patch

@@ -48,7 +48,10 @@ source_trajectory:
 
 parent_candidates:
   requested_per_task: 4
+  remove_initial_and_terminal_states: true
   nonterminal_only: true
+  order_by: trajectory_absolute_step
+  stratification: three_contiguous_relative_progress_chunks
   candidates:
     random:
       count: 3
@@ -57,17 +60,25 @@ parent_candidates:
         - early_third
         - middle_third
         - late_third
-      candidate_source: random
+      candidate_sources: [random_early, random_middle, random_late]
     swe_replay:
       count: 1
       selector: faithful_critical_step_selector
-      candidate_source: swe_replay
+      candidate_sources: [swe_replay]
   deduplicate_absolute_steps: true
-  duplicate_replacement: random_from_same_stratum_then_any_eligible_nonterminal
-  shortfall_policy: record_and_exclude_parent_shortfall_from_balanced_analysis
+  overlap_provenance: retain_both_sources_on_one_unique_parent
+  duplicate_replacement:
+    first: fixed_seed_random_from_overlapped_stratum
+    fallback: fixed_seed_random_from_all_remaining_eligible_nonterminal
+  required_unique_parents_per_task: 4
 
 label_rollout:
-  full_continuations_per_parent_requested: 8
+  target_valid_continuations_per_parent: 8
+  minimum_valid_continuations_for_formal_analysis: 6
+  maximum_total_attempts_per_parent: 12
+  invalid_retry_policy: retain_raw_and_retry_with_new_deterministic_seed
+  retry_outcomes: [invalid]
+  do_not_retry_outcomes: [solved, unsolved]
   continuation_k_is_variable_in_schema: true
   restore_exact_same_parent: true
   isolated_workspaces: true
@@ -78,7 +89,15 @@ label_rollout:
   nested_child_downstream_rollouts: false
   separate_no_branch_rollouts: false
   invalid_outcome_policy: retain_raw_exclude_from_valid_k
-  minimum_valid_k_for_primary_analysis: null  # freeze before launch
+  acceptance:
+    valid_8: accept_complete
+    valid_6_or_7: accept_with_actual_k
+    valid_below_6: retain_raw_exclude_from_formal_parent_analysis
+  cap_hit:
+    record_explicitly: true
+    main_analysis_outcome: unsolved
+    sensitivity_analysis: recompute_after_excluding_cap_hits
+    review_cap_if_rate_exceeds: 0.05
 
 shared_success_probability_model:
   output: q_state
@@ -110,8 +129,9 @@ oracle_analysis:
   judger_a_threshold_sweep: all_unique_observed_scores_plus_endpoints
   diagnostic_threshold: 0.75
   learned_threshold_selection_split: validation
-  judger_b: realized_terminal_outcome_upper_bound
-  judger_b_is_not_exact_child_q: true
+  branch_selection_upper_bound: trajectory_outcome_oracle
+  trajectory_outcome_oracle_is_clairvoyant: true
+  trajectory_outcome_oracle_is_not_child_q_oracle: true
 
 online_simulation:
   primary_branch_count: 4
@@ -122,7 +142,7 @@ online_simulation:
     - best_of_n
     - random_branching
     - faithful_swe_replay
-    - oracle_a_oracle_b
+    - oracle_a_trajectory_outcome_oracle
   compute:
     primary_axis: total_tokens
     secondary_axes: [model_calls, steps, wall_clock_seconds]
@@ -133,21 +153,21 @@ planned_scale:
   at_12_tasks:
     source_trajectories: 12
     parent_checkpoints: 48
-    full_continuations: 384
+    target_valid_full_continuations: 384
+    maximum_attempts_with_invalid_retries: 576
     grouped_parent_q_targets_max: 48
     prefix_bernoulli_q_targets_max_all_4_depths: 1536
     shared_q_targets_max_total: 1584
   at_20_tasks:
     source_trajectories: 20
     parent_checkpoints: 80
-    full_continuations: 640
+    target_valid_full_continuations: 640
+    maximum_attempts_with_invalid_retries: 960
     grouped_parent_q_targets_max: 80
     prefix_bernoulli_q_targets_max_all_4_depths: 2560
     shared_q_targets_max_total: 2640
 
 launch_gates:
   - at_least_12_independently_screened_medium_tasks
-  - freeze_minimum_valid_k_for_primary_analysis
-  - review_parent_shortfall_and_deduplication_policy
   - run_bounded_checkpoint_restore_and_verifier_smoke
   - create_immutable_resolved_manifest

@@ -16,6 +16,7 @@ class FutureSample:
     final_patch: str
     termination_reason: str
     steps: tuple[StepRecord, ...] = ()
+    cap_hit: bool = False
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,7 @@ class ParentContinuationExperiment:
 
     task_id: str
     parent_checkpoint_id: str
-    candidate_source: str
+    candidate_sources: tuple[str, ...]
     samples: tuple[FutureSample, ...]
 
     def __post_init__(self) -> None:

@@ -21,7 +21,8 @@ Accounting rules are explicit:
 - Single Chain pays for its selected continuation.
 - Best-of-N pays for all N complete attempts; it yields a selected answer only
   after this compute is spent.
-- Random or Oracle selective branching samples `N` same-parent continuations,
+- Random or Trajectory-Outcome-Oracle selective branching samples `N`
+  same-parent continuations,
   runs every one for the configured prefix span `d`, discards `N-1`, and runs
   the selected sibling to its recorded terminal result. The selected full
   continuation already includes its own prefix, so the simulator charges its

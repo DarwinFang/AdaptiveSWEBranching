@@ -5,7 +5,7 @@ import random
 from adaptive_swe_branching.baselines.swe_replay.types import ReplayResult
 from adaptive_swe_branching.data.records import Cost, Outcome
 from adaptive_swe_branching.evaluation.matched_compute import StrategyTrace
-from adaptive_swe_branching.oracle.judgers import OracleA, OracleB
+from adaptive_swe_branching.oracle.judgers import OracleA, TrajectoryOutcomeOracle
 from adaptive_swe_branching.oracle.records import (
     FutureSample,
     ParentContinuationExperiment,
@@ -54,9 +54,12 @@ def oracle_a_b(
     n: int,
     branch_span: int,
     seed: int,
+    minimum_valid_k: int,
 ) -> StrategyTrace:
     rng = random.Random(seed)
-    if not OracleA().decide(experiment, threshold=branchability_threshold):
+    if not OracleA(minimum_valid_k=minimum_valid_k).decide(
+        experiment, threshold=branchability_threshold
+    ):
         selected = rng.choice(experiment.valid_samples)
         return _trace(
             experiment.task_id,
@@ -65,7 +68,7 @@ def oracle_a_b(
             selected.cost_from_state,
         )
     candidates = _sample_siblings(experiment, n=n, seed=seed)
-    selected = OracleB().select(candidates)
+    selected = TrajectoryOutcomeOracle().select(candidates)
     total = _temporary_branch_cost(candidates, selected, branch_span)
     return _trace(experiment.task_id, f"oracle_a_b_n{n}", selected, total)
 

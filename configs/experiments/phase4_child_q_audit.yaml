@@ -1,0 +1,71 @@
+include:
+  - ../agent/qwen3_coder_30b_openhands.yaml
+  - ../benchmark/swesmith_py.yaml
+
+experiment:
+  name: phase4_child_q_audit_v1
+  method_version: nested_child_q_audit_v1
+  status: planned_not_launched
+  output_dir: /home/fangzhaohao/asb-runs/phase4_child_q_audit_v1
+  root_seed: 20260902
+  immutable_manifest_required: true
+  separate_from_primary_phase4_dataset: true
+
+depends_on:
+  phase4_run_dir: /home/fangzhaohao/asb-runs/phase4_oracle_pilot_v1
+  require_completed_immutable_manifest: true
+  use_for_primary_shared_q_training: false
+
+parent_selection:
+  population: formal_parents_with_valid_k_at_least_6_and_4_depth_6_children
+  minimum_empirical_branchability: 0.75
+  method: fixed_seed_uniform_without_replacement
+  target_parents: 12
+  allowed_range: [10, 20]
+
+children:
+  per_parent: 4
+  branch_span_steps: 6
+  source: saved_prefix_checkpoints_from_distinct_primary_continuations
+  sampling: fixed_seed_without_replacement
+
+child_q_rollout:
+  target_valid_continuations_per_child: 8
+  minimum_valid_continuations_for_formal_analysis: 6
+  maximum_total_attempts_per_child: 12
+  invalid_retry_policy: retain_raw_and_retry_with_new_deterministic_seed
+  safety_cap_steps: 60
+  cap_hit_main_outcome: unsolved
+  cap_hit_sensitivity_analysis: exclude_and_recompute
+
+derived_analysis:
+  child_q: successful_valid_continuations/valid_continuations
+  primary_spread: max_child_q-minus-mean_child_q
+  additional_statistics:
+    - max_child_q_minus_min_child_q
+    - child_q_standard_deviation
+    - parent_branchability_vs_child_q_spread
+    - trajectory_outcome_candidate_set_vs_child_q_oracle_overlap
+    - trajectory_outcome_best_case_child_q_regret
+    - trajectory_outcome_worst_case_child_q_regret
+    - trajectory_outcome_uniform_tie_expected_child_q_regret
+  child_q_oracle: argmax_empirical_child_q
+  trajectory_outcome_oracle: choose_by_original_realized_full_trajectory_outcome
+
+planned_scale:
+  at_10_parents:
+    children: 40
+    target_valid_nested_continuations: 320
+  at_12_parents:
+    children: 48
+    target_valid_nested_continuations: 384
+    maximum_attempts_with_retries: 576
+  at_20_parents:
+    children: 80
+    target_valid_nested_continuations: 640
+
+launch_gates:
+  - primary_phase4_completed_and_audited
+  - at_least_10_high_branchability_formal_parents
+  - verify_all_selected_depth_6_child_checkpoints_restore
+  - create_immutable_resolved_manifest

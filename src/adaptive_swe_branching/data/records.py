@@ -175,6 +175,9 @@ class ContinuationRecord:
     post_parent_step_start: int = 0
     post_parent_step_count: int | None = None
     prefix_checkpoint_ids_by_depth: dict[int, str] = field(default_factory=dict)
+    attempt_index: int = 0
+    replacement_for_invalid_continuation_id: str | None = None
+    cap_hit: bool = False
     branch_group_id: str | None = None
     child_checkpoint_id: str | None = None
     invalid_reason: str | None = None
@@ -192,9 +195,29 @@ class ParentContinuationGroupRecord:
     group_id: str
     task_id: str
     parent_checkpoint_id: str
-    candidate_source: str
-    requested_k: int
+    candidate_sources: tuple[str, ...]
+    target_valid_k: int
+    minimum_valid_k: int
     continuation_ids: tuple[str, ...]
+    protocol: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ChildQAuditGroupRecord:
+    """Small, explicitly nested audit of true child-state success rates."""
+
+    audit_group_id: str
+    task_id: str
+    parent_checkpoint_id: str
+    parent_branchability: float
+    branch_span_steps: int
+    child_checkpoint_ids: tuple[str, ...]
+    target_valid_k_per_child: int
+    minimum_valid_k_per_child: int
+    continuation_ids_by_child: dict[str, tuple[str, ...]]
     protocol: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
