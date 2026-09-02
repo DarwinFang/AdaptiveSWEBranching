@@ -7,26 +7,29 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
-LOW_Q_ACTIONS = ("cold_continue", "ranked_rollback")
+LOW_Q_ACTIONS = ("cold_continue", "ranked_rollback", "branch_current")
 
 
 @dataclass(frozen=True)
 class RankedRetryPolicy:
     """Frozen online policy after one temporary branch group is created.
 
-    ``cold_continue`` is deliberately the default: a low-q active child keeps
-    running as the single chain. ``ranked_rollback`` enables the more active
-    alternative that restores the branch point and tries the next saved child.
+    ``branch_current`` is the default: every evaluated checkpoint below the
+    high-q cutoff buys a fresh temporary branch group. The two alternatives
+    either keep a low-q chain unchanged or revisit an earlier ranked child.
     """
 
     low_q_threshold: float
+    high_q_no_branch_threshold: float
     max_candidate_attempts_p: int
     q_reassessment_interval_steps: int
-    low_q_action: str = "cold_continue"
+    low_q_action: str = "branch_current"
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.low_q_threshold <= 1.0:
             raise ValueError("low_q_threshold must be in [0, 1]")
+        if not 0.0 <= self.high_q_no_branch_threshold <= 1.0:
+            raise ValueError("high_q_no_branch_threshold must be in [0, 1]")
         if self.max_candidate_attempts_p < 1:
             raise ValueError("max_candidate_attempts_p must be positive")
         if self.q_reassessment_interval_steps < 1:
@@ -179,7 +182,8 @@ class BranchControllerEvent:
     from_candidate_id: str | None
     to_candidate_id: str | None
     active_q: float | None
-    low_q_threshold: float | None
+    q_threshold: float | None
+    spawned_branch_point_id: str | None
     termination_reason: str | None
 
     def to_dict(self) -> dict[str, Any]:
@@ -257,7 +261,8 @@ class RankedAlternativeController:
             from_candidate_id=None,
             to_candidate_id=selected.candidate_id,
             active_q=None,
-            low_q_threshold=None,
+            q_threshold=None,
+            spawned_branch_point_id=None,
             termination_reason=None,
         )
         self._save(updated, event)
@@ -286,7 +291,8 @@ class RankedAlternativeController:
                 from_candidate_id=previous,
                 to_candidate_id=previous,
                 active_q=active_q,
-                low_q_threshold=low_q_threshold,
+                q_threshold=low_q_threshold,
+                spawned_branch_point_id=None,
                 termination_reason=None,
             )
             self._save(updated, event)
@@ -307,7 +313,8 @@ class RankedAlternativeController:
                 from_candidate_id=previous,
                 to_candidate_id=None,
                 active_q=active_q,
-                low_q_threshold=low_q_threshold,
+                q_threshold=low_q_threshold,
+                spawned_branch_point_id=None,
                 termination_reason=reason,
             )
             self._save(updated, event)
@@ -327,7 +334,8 @@ class RankedAlternativeController:
             from_candidate_id=previous,
             to_candidate_id=selected.candidate_id,
             active_q=active_q,
-            low_q_threshold=low_q_threshold,
+            q_threshold=low_q_threshold,
+            spawned_branch_point_id=None,
             termination_reason=None,
         )
         self._save(updated, event)
@@ -358,11 +366,73 @@ class RankedAlternativeController:
             from_candidate_id=current,
             to_candidate_id=current,
             active_q=active_q,
-            low_q_threshold=low_q_threshold,
+            q_threshold=low_q_threshold,
+            spawned_branch_point_id=None,
             termination_reason=None,
         )
         self._save(updated, event)
         return RollbackDecision("cold_continue_candidate", updated, None, None)
+
+    def record_branch_current(
+        self,
+        state: BranchPointState,
+        *,
+        active_q: float,
+        high_q_no_branch_threshold: float,
+        spawned_branch_point_id: str,
+        selected_candidate_id: str,
+    ) -> BranchPointState:
+        """Link an old active branch to a new branch group at its current state."""
+
+        if not 0.0 <= active_q <= 1.0:
+            raise ValueError("active_q must be in [0, 1]")
+        if not 0.0 <= high_q_no_branch_threshold <= 1.0:
+            raise ValueError("high_q_no_branch_threshold must be in [0, 1]")
+        updated = state.advance_revision(current_candidate_id=None)
+        event = BranchControllerEvent(
+            branch_point_id=updated.branch_point_id,
+            revision=updated.revision,
+            action="branch_from_current_checkpoint",
+            parent_checkpoint_id=updated.parent_checkpoint_id,
+            from_candidate_id=state.current_candidate_id,
+            to_candidate_id=selected_candidate_id,
+            active_q=active_q,
+            q_threshold=high_q_no_branch_threshold,
+            spawned_branch_point_id=spawned_branch_point_id,
+            termination_reason=None,
+        )
+        self._save(updated, event)
+        return updated
+
+    def record_high_q_continue(
+        self,
+        state: BranchPointState,
+        *,
+        active_q: float,
+        high_q_no_branch_threshold: float,
+    ) -> BranchPointState:
+        """Record the sole no-branch case for ``branch_current`` policy."""
+
+        if not 0.0 <= active_q <= 1.0:
+            raise ValueError("active_q must be in [0, 1]")
+        if not 0.0 <= high_q_no_branch_threshold <= 1.0:
+            raise ValueError("high_q_no_branch_threshold must be in [0, 1]")
+        current = state.current_candidate_id
+        updated = state.advance_revision()
+        event = BranchControllerEvent(
+            branch_point_id=updated.branch_point_id,
+            revision=updated.revision,
+            action="continue_high_q_without_branching",
+            parent_checkpoint_id=updated.parent_checkpoint_id,
+            from_candidate_id=current,
+            to_candidate_id=current,
+            active_q=active_q,
+            q_threshold=high_q_no_branch_threshold,
+            spawned_branch_point_id=None,
+            termination_reason=None,
+        )
+        self._save(updated, event)
+        return updated
 
     def _save(
         self, state: BranchPointState, event: BranchControllerEvent

@@ -8,29 +8,31 @@ The default policy is one ordinary SWE-agent trajectory. It does not maintain a
 permanent particle population. At a candidate executable checkpoint:
 
 1. a candidate proposer identifies a place where a branch decision may be useful;
-2. **Judger A / Branch Gate** predicts whether the parent's possible outcomes
-   straddle the success/failure boundary;
+2. **Judger A / Branch Gate** estimates `q(parent)` and applies the configured
+   compute-allocation policy;
 3. only when the gate accepts, the system restores the checkpoint into `N`
    isolated workspaces and runs each child for a configurable local span;
 4. the same model scores the resulting executable child states for **Judger B**;
 5. the search collapses to the chosen child and resumes as a single trajectory.
 
-If the selected suffix later falls below a configured threshold, the default
-`cold_continue` policy simply keeps following that child as the single chain:
-it spends no additional branching compute and performs no restore. An optional
-`ranked_rollback` policy instead restores the original branch point and then the
-highest-ranked previously generated child that has not been attempted. It does
-not sample a new child. After configurable `P <= N` attempts, another rollback
-terminates with `branch_candidates_exhausted`. The selected policy, ranked list,
-attempts and every transition are persisted in the experiment records.
+One manifest-frozen switch keeps three interpretations of low `q` separate:
 
-This switch applies **after branching**. It is separate from Judger A's
-parent-state rule: both low and high parent `q` have low `4q(1-q)` and therefore
-do not trigger the ordinary uncertainty gate. The low-`q` action, generated-child
-count `N`, attempted-child cap `P`, threshold and `q` reassessment interval are
-independent, manifest-frozen online-policy hyperparameters. The current default
-is `cold_continue`; `ranked_rollback` remains available for a controlled
-comparison selected on validation data.
+- `cold_continue`: use the uncertainty gate `4q(1-q)`; a low-q state receives
+  no extra branching compute and the current single chain continues.
+- `ranked_rollback`: use the same uncertainty gate; after a previous branching
+  decision, a low-q active suffix restores the old branch point and tries the
+  next ranked saved child. After configurable `P <= N` attempts, another
+  rollback terminates with `branch_candidates_exhausted`.
+- `branch_current` (**current default**): branch at the current evaluated
+  checkpoint whenever `q` is below a configurable high-q cutoff, rank the new
+  children by `q`, and collapse to the best. Only a sufficiently high-q state
+  avoids that extra compute.
+
+The policy, generated-child count `N`, attempted-child cap `P`, both relevant q
+thresholds and the q reassessment interval are independent online-policy
+hyperparameters. Every branch, restore, selected child and policy transition is
+persisted. Policy and thresholds are selected on validation data, never test
+outcomes.
 
 ```text
 single trajectory
@@ -39,8 +41,8 @@ candidate checkpoint  <- proposer only; this is not the branch decision
       |
 shared model q(parent)
       |
-Judger A: 4 q(parent) (1-q(parent))
-      | yes
+Judger A: configured q-based compute policy
+      | branch
 N short, executable child branches
       |
 same shared model q(child): choose max
@@ -53,16 +55,16 @@ collapse to one child and continue
 The project uses one conventional success-probability value model in two
 different inference decisions:
 
-- **A — Branch Gate:** evaluate `q(parent)`, then compute
-  `4 q(parent) (1 - q(parent))`. A high score means the parent lies near an
-  outcome boundary where temporary branching may be useful.
+- **A — Branch Gate:** evaluate `q(parent)`. The two uncertainty policies use
+  `4 q(parent) (1 - q(parent))`; the current `branch_current` policy branches
+  whenever `q(parent)` is below its high-q no-branch cutoff.
 - **B — Branch Ranker:** after short executable child states exist, evaluate the
   same `q(child)` for each state and keep the largest.
 
-Easy states have low branchability because almost every continuation succeeds.
-Hopeless states also have low branchability because almost every continuation
-fails. The expected opportunity lies near the policy's competence boundary,
-once the trajectory contains enough closed-loop diagnostic evidence.
+Easy states still avoid extra compute. Whether hopeless-looking states should
+also be left alone, should revisit an earlier alternative, or should receive a
+fresh rescue branch is now an explicit experimental question rather than an
+assumption hidden in the implementation.
 
 There are not two learned models, heads, or losses. The shared model estimates
 `q(state) = P(success | state)` with binomial supervision. Parent states usually

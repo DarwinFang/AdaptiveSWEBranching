@@ -51,8 +51,14 @@ def test_phase4_manifest_freezes_single_shared_q_model() -> None:
     assert config["label_rollout"]["cap_hit"]["main_analysis_outcome"] == "unsolved"
     retry = config["ranked_alternative_retry"]
     assert retry["children_n_sweep"] == [2, 4]
-    assert retry["low_q_action"] == "cold_continue"
-    assert retry["low_q_action_sweep"] == ["cold_continue", "ranked_rollback"]
+    assert retry["low_q_action"] == "branch_current"
+    assert retry["low_q_action_sweep"] == [
+        "cold_continue",
+        "ranked_rollback",
+        "branch_current",
+    ]
+    assert retry["high_q_no_branch_threshold"] == 0.8
+    assert retry["high_q_no_branch_threshold_sweep"] == [0.7, 0.8, 0.9]
     assert retry["max_candidate_attempts_p_sweep"] == [1, 2, 3, 4]
     assert retry["low_q_threshold_sweep"] == [0.1, 0.2, 0.3, 0.4]
     assert retry["q_reassessment_interval_steps_sweep"] == [1, 2, 4, 6]

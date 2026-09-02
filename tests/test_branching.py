@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from conftest import make_trajectory
 
+from adaptive_swe_branching.branching.alternatives import (
+    RankedAlternativeStore,
+    RankedRetryPolicy,
+)
 from adaptive_swe_branching.branching.engine import ChildExecution, TemporaryBrancher
 from adaptive_swe_branching.branching.gate import SuccessProbabilityGate
 from adaptive_swe_branching.branching.parent_candidates import (
     merge_swe_replay_candidate,
     stratified_random_parents,
 )
-from adaptive_swe_branching.branching.proposer import CandidateNode
+from adaptive_swe_branching.branching.proposer import CandidateNode, EveryKStepsProposer
 from adaptive_swe_branching.branching.ranker import SuccessProbabilityRanker
+from adaptive_swe_branching.branching.scheduler import SelectiveBranchingScheduler
 from adaptive_swe_branching.branching.success_probability import (
     SuccessProbabilityEstimate,
 )
@@ -82,6 +87,54 @@ def test_gate_and_ranker_share_one_q_model_with_different_rules() -> None:
     ranked = SuccessProbabilityRanker(model).rank(checkpoint("parent"), children)
     assert ranked[0].child.checkpoint.checkpoint_id == "child-checkpoint-1"
     assert ranked[0].score == 0.8
+
+
+def branch_current_scheduler(tmp_path, *, parent_q: float):
+    model = FixedQModel(
+        {
+            "parent": parent_q,
+            "child-checkpoint-0": 0.2,
+            "child-checkpoint-1": 0.8,
+        }
+    )
+    return SelectiveBranchingScheduler(
+        proposer=EveryKStepsProposer(every=1),
+        gate=SuccessProbabilityGate(model=model, branchability_threshold=0.75),
+        brancher=TemporaryBrancher(
+            children=2, local_span_steps=3, root_seed=9, backend=Backend()
+        ),
+        ranker=SuccessProbabilityRanker(model),
+        success_model=model,
+        retry_policy=RankedRetryPolicy(
+            low_q_threshold=0.2,
+            high_q_no_branch_threshold=0.8,
+            max_candidate_attempts_p=2,
+            q_reassessment_interval_steps=3,
+            low_q_action="branch_current",
+        ),
+        alternative_store=RankedAlternativeStore(tmp_path / "alternatives"),
+    )
+
+
+def test_branch_current_gate_branches_at_low_q_and_selects_best_child(
+    tmp_path,
+) -> None:
+    scheduler = branch_current_scheduler(tmp_path, parent_q=0.05)
+    decision = scheduler.decide(make_trajectory("source"), checkpoint("parent"))
+
+    assert decision.action == "collapse_to_child"
+    assert decision.gate is not None and decision.gate.branch
+    assert decision.selected is not None
+    assert decision.selected.child.checkpoint.checkpoint_id == "child-checkpoint-1"
+
+
+def test_branch_current_gate_rejects_at_high_q_cutoff(tmp_path) -> None:
+    scheduler = branch_current_scheduler(tmp_path, parent_q=0.8)
+    decision = scheduler.decide(make_trajectory("source"), checkpoint("parent"))
+
+    assert decision.action == "gate_rejected"
+    assert decision.gate is not None and not decision.gate.branch
+    assert decision.selected is None
 
 
 def test_relative_thirds_and_swe_replay_overlap_keep_four_unique_parents() -> None:

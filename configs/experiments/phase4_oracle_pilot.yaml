@@ -120,7 +120,9 @@ shared_success_probability_model:
 inference_roles:
   judger_a:
     input: parent_executable_checkpoint
-    score: 4*q_parent*(1-q_parent)
+    shared_prediction: q_parent
+    uncertainty_policy_score: 4*q_parent*(1-q_parent)
+    current_default_policy: branch_if_q_below_high_q_no_branch_threshold
   judger_b:
     input: each_generated_child_executable_checkpoint
     selection: argmax_q_child
@@ -130,11 +132,13 @@ ranked_alternative_retry:
   # Phase 4 selects them on validation data; no test result may choose them.
   primary_children_n: 4
   children_n_sweep: [2, 4]
-  # What to do when a previously selected child later has low q. The default
-  # treats both low-q and high-q states conservatively: keep one chain and do
-  # not spend more compute switching among saved alternatives.
-  low_q_action: cold_continue
-  low_q_action_sweep: [cold_continue, ranked_rollback]
+  # Three competing online policies. The current default buys a temporary
+  # branch group at every evaluated checkpoint below the high-q cutoff; only a
+  # sufficiently promising chain avoids that extra compute.
+  low_q_action: branch_current
+  low_q_action_sweep: [cold_continue, ranked_rollback, branch_current]
+  high_q_no_branch_threshold: 0.8
+  high_q_no_branch_threshold_sweep: [0.7, 0.8, 0.9]
   max_candidate_attempts_p_sweep: [1, 2, 3, 4]
   low_q_threshold_sweep: [0.1, 0.2, 0.3, 0.4]
   q_reassessment_interval_steps_sweep: [1, 2, 4, 6]

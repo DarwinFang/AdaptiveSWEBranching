@@ -37,6 +37,9 @@ class ActiveBranchDecision:
     active_q: float | None
     branch_point_state: BranchPointState
     selected_alternative: RankedAlternative | None
+    selected_child: RankedChild | None
+    branch_group_id: str | None
+    superseded_branch_point_state: BranchPointState | None
     termination_reason: str | None
 
 
@@ -68,9 +71,31 @@ class SelectiveBranchingScheduler:
         candidate = self.proposer.propose(trajectory, checkpoint)
         if candidate is None:
             return SchedulingDecision("continue_single", None, None, None, None)
-        gate = self.gate.decide(candidate)
+        if self.retry_policy.low_q_action == "branch_current":
+            estimate = self.success_model.predict(checkpoint)
+            cutoff = self.retry_policy.high_q_no_branch_threshold
+            gate = GateDecision(
+                branch=estimate.q < cutoff,
+                score=1.0 - estimate.q,
+                threshold=1.0 - cutoff,
+                predicted_branch_cost=None,
+                explanation=(
+                    f"shared_q={estimate.q:.6f}; branch_current unless "
+                    f"q>={cutoff:.6f}"
+                ),
+            )
+        else:
+            gate = self.gate.decide(candidate)
         if not gate.branch:
             return SchedulingDecision("gate_rejected", gate, None, None, None)
+        group_id, selected, state = self._branch_and_collapse(checkpoint)
+        return SchedulingDecision(
+            "collapse_to_child", gate, selected, group_id, state
+        )
+
+    def _branch_and_collapse(
+        self, checkpoint: CheckpointRecord
+    ) -> tuple[str, RankedChild, BranchPointState]:
         group, children = self.brancher.branch(checkpoint)
         ranked = self.ranker.rank(checkpoint, children)
         if not ranked:
@@ -94,6 +119,9 @@ class SelectiveBranchingScheduler:
                 "max_attempts_p": self.retry_policy.max_candidate_attempts_p,
                 "low_q_action": self.retry_policy.low_q_action,
                 "low_q_threshold": self.retry_policy.low_q_threshold,
+                "high_q_no_branch_threshold": (
+                    self.retry_policy.high_q_no_branch_threshold
+                ),
                 "q_reassessment_interval_steps": (
                     self.retry_policy.q_reassessment_interval_steps
                 ),
@@ -106,13 +134,7 @@ class SelectiveBranchingScheduler:
             if item.child.record.child_branch_id == initial.selected.candidate_id
         )
         # The caller resumes only this checkpoint: the population collapses.
-        return SchedulingDecision(
-            "collapse_to_child",
-            gate,
-            selected,
-            group.branch_group_id,
-            initial.state,
-        )
+        return group.branch_group_id, selected, initial.state
 
     def reassess_active_branch(
         self,
@@ -122,13 +144,13 @@ class SelectiveBranchingScheduler:
         steps_since_last_q_assessment: int,
         restorer: AlternativeRestorer,
     ) -> ActiveBranchDecision:
-        """Continue, cold-handle low q, roll back, or terminate.
+        """Continue, branch here, roll back, or terminate.
 
         The caller invokes this while following the currently selected child.
-        With the default ``cold_continue`` policy, low q leaves the active single
-        chain unchanged. With ``ranked_rollback``, a rollback never samples a
-        replacement: it restores the original branch point and the highest-ranked
-        child that has not already been attempted.
+        ``cold_continue`` leaves low q alone. ``ranked_rollback`` restores the
+        original branch point and its highest-ranked untried child.
+        ``branch_current`` creates and collapses a fresh branch group unless q is
+        already at or above its high-q no-branch cutoff.
         """
 
         if steps_since_last_q_assessment < 0:
@@ -142,10 +164,51 @@ class SelectiveBranchingScheduler:
                 active_q=None,
                 branch_point_state=state,
                 selected_alternative=None,
+                selected_child=None,
+                branch_group_id=None,
+                superseded_branch_point_state=None,
                 termination_reason=None,
             )
 
         estimate = self.success_model.predict(active_checkpoint)
+        if self.retry_policy.low_q_action == "branch_current":
+            cutoff = self.retry_policy.high_q_no_branch_threshold
+            if estimate.q >= cutoff:
+                updated = self.alternatives.record_high_q_continue(
+                    state,
+                    active_q=estimate.q,
+                    high_q_no_branch_threshold=cutoff,
+                )
+                return ActiveBranchDecision(
+                    action="continue_high_q_without_branching",
+                    active_q=estimate.q,
+                    branch_point_state=updated,
+                    selected_alternative=None,
+                    selected_child=None,
+                    branch_group_id=None,
+                    superseded_branch_point_state=None,
+                    termination_reason=None,
+                )
+            group_id, selected, next_state = self._branch_and_collapse(
+                active_checkpoint
+            )
+            superseded = self.alternatives.record_branch_current(
+                state,
+                active_q=estimate.q,
+                high_q_no_branch_threshold=cutoff,
+                spawned_branch_point_id=group_id,
+                selected_candidate_id=selected.child.record.child_branch_id,
+            )
+            return ActiveBranchDecision(
+                action="branch_current_and_collapse",
+                active_q=estimate.q,
+                branch_point_state=next_state,
+                selected_alternative=None,
+                selected_child=selected,
+                branch_group_id=group_id,
+                superseded_branch_point_state=superseded,
+                termination_reason=None,
+            )
         if (
             estimate.q < self.retry_policy.low_q_threshold
             and self.retry_policy.low_q_action == "cold_continue"
@@ -167,5 +230,8 @@ class SelectiveBranchingScheduler:
             active_q=estimate.q,
             branch_point_state=rollback.state,
             selected_alternative=rollback.selected,
+            selected_child=None,
+            branch_group_id=None,
+            superseded_branch_point_state=None,
             termination_reason=rollback.termination_reason,
         )

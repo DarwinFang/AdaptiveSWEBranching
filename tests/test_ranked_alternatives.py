@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from conftest import make_trajectory
 
 from adaptive_swe_branching.branching.alternatives import (
     BranchPointState,
@@ -10,6 +12,8 @@ from adaptive_swe_branching.branching.alternatives import (
     RankedAlternativeStore,
     RankedRetryPolicy,
 )
+from adaptive_swe_branching.branching.engine import ChildExecution, TemporaryBrancher
+from adaptive_swe_branching.branching.ranker import SuccessProbabilityRanker
 from adaptive_swe_branching.branching.scheduler import SelectiveBranchingScheduler
 from adaptive_swe_branching.branching.success_probability import (
     SuccessProbabilityEstimate,
@@ -159,16 +163,41 @@ def active_checkpoint() -> CheckpointRecord:
 
 
 def retry_scheduler(
-    tmp_path: Path, *, q: float, low_q_action: str = "cold_continue"
+    tmp_path: Path,
+    *,
+    q: float,
+    low_q_action: str,
+    with_brancher: bool = False,
 ) -> SelectiveBranchingScheduler:
+    class Backend:
+        def run_child(self, *, parent, branch_index, seed, local_span_steps):
+            return ChildExecution(
+                local_trajectory=make_trajectory(f"child-{branch_index}"),
+                child_checkpoint=active_checkpoint_with_id(
+                    f"child-checkpoint-{branch_index}"
+                ),
+            )
+
+    model = FixedActiveQ(q)
     return SelectiveBranchingScheduler(
         proposer=None,  # type: ignore[arg-type]
         gate=None,  # type: ignore[arg-type]
-        brancher=None,  # type: ignore[arg-type]
-        ranker=None,  # type: ignore[arg-type]
-        success_model=FixedActiveQ(q),
+        brancher=(
+            TemporaryBrancher(
+                children=2, local_span_steps=3, root_seed=19, backend=Backend()
+            )
+            if with_brancher
+            else None  # type: ignore[arg-type]
+        ),
+        ranker=(
+            SuccessProbabilityRanker(model)
+            if with_brancher
+            else None  # type: ignore[arg-type]
+        ),
+        success_model=model,
         retry_policy=RankedRetryPolicy(
             low_q_threshold=0.2,
+            high_q_no_branch_threshold=0.8,
             max_candidate_attempts_p=2,
             q_reassessment_interval_steps=3,
             low_q_action=low_q_action,
@@ -180,7 +209,7 @@ def retry_scheduler(
 def test_scheduler_default_cold_policy_does_not_restore_or_consume_candidate(
     tmp_path: Path,
 ) -> None:
-    scheduler = retry_scheduler(tmp_path, q=0.1)
+    scheduler = retry_scheduler(tmp_path, q=0.1, low_q_action="cold_continue")
     restorer = RecordingRestorer()
     state = scheduler.alternatives.start(new_state(max_attempts=2)).state
 
@@ -250,13 +279,85 @@ def test_retry_policy_hyperparameters_are_validated() -> None:
     with pytest.raises(ValueError, match="low_q_threshold"):
         RankedRetryPolicy(
             low_q_threshold=1.1,
+            high_q_no_branch_threshold=0.8,
             max_candidate_attempts_p=2,
             q_reassessment_interval_steps=3,
         )
     with pytest.raises(ValueError, match="low_q_action"):
         RankedRetryPolicy(
             low_q_threshold=0.2,
+            high_q_no_branch_threshold=0.8,
             max_candidate_attempts_p=2,
             q_reassessment_interval_steps=3,
             low_q_action="invent_new_policy",
         )
+    with pytest.raises(ValueError, match="high_q_no_branch_threshold"):
+        RankedRetryPolicy(
+            low_q_threshold=0.2,
+            high_q_no_branch_threshold=1.1,
+            max_candidate_attempts_p=2,
+            q_reassessment_interval_steps=3,
+        )
+
+
+def active_checkpoint_with_id(checkpoint_id: str) -> CheckpointRecord:
+    return replace(active_checkpoint(), checkpoint_id=checkpoint_id)
+
+
+def test_branch_current_is_default_policy() -> None:
+    policy = RankedRetryPolicy(
+        low_q_threshold=0.2,
+        high_q_no_branch_threshold=0.8,
+        max_candidate_attempts_p=2,
+        q_reassessment_interval_steps=3,
+    )
+    assert policy.low_q_action == "branch_current"
+
+
+def test_branch_current_rolls_below_cutoff_and_collapses_to_new_child(
+    tmp_path: Path,
+) -> None:
+    scheduler = retry_scheduler(
+        tmp_path, q=0.1, low_q_action="branch_current", with_brancher=True
+    )
+    restorer = RecordingRestorer()
+    old_state = scheduler.alternatives.start(new_state(max_attempts=2)).state
+
+    decision = scheduler.reassess_active_branch(
+        state=old_state,
+        active_checkpoint=active_checkpoint(),
+        steps_since_last_q_assessment=3,
+        restorer=restorer,
+    )
+
+    assert decision.action == "branch_current_and_collapse"
+    assert decision.selected_child is not None
+    assert decision.branch_group_id == decision.branch_point_state.branch_point_id
+    assert decision.superseded_branch_point_state is not None
+    assert decision.superseded_branch_point_state.current_candidate_id is None
+    assert restorer.calls == []
+    assert scheduler.alternatives.store.events("branch-1")[-1]["action"] == (
+        "branch_from_current_checkpoint"
+    )
+
+
+def test_branch_current_skips_branching_at_or_above_high_q_cutoff(
+    tmp_path: Path,
+) -> None:
+    scheduler = retry_scheduler(
+        tmp_path, q=0.8, low_q_action="branch_current", with_brancher=True
+    )
+    restorer = RecordingRestorer()
+    state = scheduler.alternatives.start(new_state(max_attempts=2)).state
+
+    decision = scheduler.reassess_active_branch(
+        state=state,
+        active_checkpoint=active_checkpoint(),
+        steps_since_last_q_assessment=3,
+        restorer=restorer,
+    )
+
+    assert decision.action == "continue_high_q_without_branching"
+    assert decision.selected_child is None
+    assert decision.branch_group_id is None
+    assert restorer.calls == []
