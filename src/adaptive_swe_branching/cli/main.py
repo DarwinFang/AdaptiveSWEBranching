@@ -37,7 +37,7 @@ def main() -> None:
     )
     replay.add_argument("--config", required=True)
     screening = subcommands.add_parser(
-        "screen-difficulty", help="run or resume independent 8-root task screening"
+        "screen-difficulty", help="run or resume independent root task screening"
     )
     screening.add_argument("--config", required=True)
     arguments = parser.parse_args()

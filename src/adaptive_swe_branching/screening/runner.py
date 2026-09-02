@@ -147,7 +147,7 @@ def safe_parallel_batch_size(
 
 
 class DifficultyScreeningRunner:
-    """Independent task stratification under the frozen 8-run rule."""
+    """Independent task stratification under the configured frozen rule."""
 
     def __init__(
         self,
