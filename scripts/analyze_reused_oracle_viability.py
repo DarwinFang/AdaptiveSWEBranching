@@ -25,7 +25,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
 AXES = ("steps", "tokens", "wall_clock_seconds")
 METRICS = (
     "mean_checkpoint_success",
