@@ -93,12 +93,15 @@ def test_compatible_imported_tasks_are_screened_first() -> None:
 def test_parallel_batches_never_launch_past_first_possible_decision(
     successes, observed, target, workers, expected
 ) -> None:
-    assert safe_parallel_batch_size(
-        successes=successes,
-        observed_valid_runs=observed,
-        target_valid_runs=target,
-        maximum_workers=workers,
-    ) == expected
+    assert (
+        safe_parallel_batch_size(
+            successes=successes,
+            observed_valid_runs=observed,
+            target_valid_runs=target,
+            maximum_workers=workers,
+        )
+        == expected
+    )
 
 
 def test_four_task_workers_map_two_slots_to_each_gpu_service() -> None:

@@ -99,9 +99,7 @@ def selected_cohort(
         "selection": "first_by_frozen_sampling_order_within_class",
         "quotas": quotas,
         "task_ids_by_class": selected,
-        "all_task_ids": [
-            task_id for name in quotas for task_id in selected[name]
-        ],
+        "all_task_ids": [task_id for name in quotas for task_id in selected[name]],
     }
 
 
@@ -163,8 +161,8 @@ def worker_endpoint_groups(
         )
     return tuple(
         endpoints[
-            task_index * parallel_runs_per_task :
-            (task_index + 1) * parallel_runs_per_task
+            task_index * parallel_runs_per_task : (task_index + 1)
+            * parallel_runs_per_task
         ]
         for task_index in range(parallel_tasks)
     )
@@ -274,19 +272,11 @@ class DifficultyScreeningRunner:
                             repository=str(item["repository"]),
                             sample_index=int(item["sample_index"]),
                             prior_runs=[
-                                run
-                                for run in runs
-                                if run["task_id"] == item["task_id"]
+                                run for run in runs if run["task_id"] == item["task_id"]
                             ],
-                            imported_successes=int(
-                                item.get("imported_successes", 0)
-                            ),
-                            imported_valid_runs=int(
-                                item.get("imported_valid_runs", 0)
-                            ),
-                            evidence_source=str(
-                                item.get("evidence_source", "fresh")
-                            ),
+                            imported_successes=int(item.get("imported_successes", 0)),
+                            imported_valid_runs=int(item.get("imported_valid_runs", 0)),
+                            evidence_source=str(item.get("evidence_source", "fresh")),
                             agent_base_urls=self.endpoint_groups[worker_index],
                         ): item
                         for worker_index, item in enumerate(batch)
@@ -353,9 +343,7 @@ class DifficultyScreeningRunner:
                 Path(path_value).expanduser().read_text(encoding="utf-8")
             )
             if payload.get("definition") != expected_definition:
-                raise ValueError(
-                    "imported screening counts use a different definition"
-                )
+                raise ValueError("imported screening counts use a different definition")
             rows = payload["tasks"]
             task_ids = [row["task_id"] for row in rows]
             if len(task_ids) != len(set(task_ids)):
@@ -393,9 +381,7 @@ class DifficultyScreeningRunner:
         try:
             return self.raw.get("screening_plan", self.screen_version)
         except FileNotFoundError:
-            pool = list(
-                self.dataset.screening_pool(split=str(self.benchmark["split"]))
-            )
+            pool = list(self.dataset.screening_pool(split=str(self.benchmark["split"])))
             pool = order_screening_pool(
                 pool, root_seed=self.root_seed, imported=self.imported
             )
@@ -645,9 +631,7 @@ class DifficultyScreeningRunner:
                 if result.finished:
                     break
             _, final_patch, _, _ = git_state(workspace)
-            verification = self.verifier.verify(
-                task, final_patch, record_scope=run_id
-            )
+            verification = self.verifier.verify(task, final_patch, record_scope=run_id)
             invalid_reason = verification.record.invalid_reason
             termination_reason = (
                 agent.termination_reason if agent.finished else "absolute_step_cap"
@@ -758,8 +742,7 @@ class DifficultyScreeningRunner:
         if not root.exists():
             return []
         return [
-            json.loads(path.read_text(encoding="utf-8"))
-            for path in root.glob("*.json")
+            json.loads(path.read_text(encoding="utf-8")) for path in root.glob("*.json")
         ]
 
     def _write_progress(
@@ -832,9 +815,7 @@ class DifficultyScreeningRunner:
             "purpose": PURPOSE,
             "complete": complete,
             "total_tasks_screened": len(summaries),
-            "currently_running_tasks": (
-                sorted(self.current_tasks)
-            ),
+            "currently_running_tasks": (sorted(self.current_tasks)),
             "counts": {
                 name: {"current": counts[name], "target": target}
                 for name, target in self.quotas.items()
