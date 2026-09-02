@@ -22,6 +22,12 @@ not sample a new child. After configurable `P <= N` attempts, another rollback
 terminates with `branch_candidates_exhausted`. The ranked list, attempts and
 every transition are persisted as append-only raw controller records.
 
+This low-`q` rule applies **after branching**. It is separate from Judger A's
+parent-state rule: a low parent `q` has low `4q(1-q)` and does not trigger the
+ordinary uncertainty gate. The generated-child count `N`, attempted-child cap
+`P`, rollback threshold and `q` reassessment interval are independent,
+manifest-frozen online-policy hyperparameters.
+
 ```text
 single trajectory
       |

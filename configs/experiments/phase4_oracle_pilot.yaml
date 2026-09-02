@@ -125,6 +125,19 @@ inference_roles:
     input: each_generated_child_executable_checkpoint
     selection: argmax_q_child
 
+ranked_alternative_retry:
+  # These are online-policy hyperparameters, not learned-model parameters.
+  # Phase 4 selects them on validation data; no test result may choose them.
+  primary_children_n: 4
+  children_n_sweep: [2, 4]
+  max_candidate_attempts_p_sweep: [1, 2, 3, 4]
+  rollback_q_threshold_sweep: [0.1, 0.2, 0.3, 0.4]
+  q_reassessment_interval_steps_sweep: [1, 2, 4, 6]
+  low_q_action: restore_branch_point_then_next_ranked_untried_child
+  never_resample_replacement_child: true
+  after_p_attempts_exhausted: terminate_branch_search_as_unsolved
+  threshold_selection_split: validation
+
 oracle_analysis:
   judger_a_threshold_sweep: all_unique_observed_scores_plus_endpoints
   diagnostic_threshold: 0.75

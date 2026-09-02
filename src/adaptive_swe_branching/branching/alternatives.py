@@ -9,6 +9,23 @@ from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
+class RankedRetryPolicy:
+    """Frozen online policy after one temporary branch group is created."""
+
+    rollback_q_threshold: float
+    max_candidate_attempts_p: int
+    q_reassessment_interval_steps: int
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.rollback_q_threshold <= 1.0:
+            raise ValueError("rollback_q_threshold must be in [0, 1]")
+        if self.max_candidate_attempts_p < 1:
+            raise ValueError("max_candidate_attempts_p must be positive")
+        if self.q_reassessment_interval_steps < 1:
+            raise ValueError("q_reassessment_interval_steps must be positive")
+
+
+@dataclass(frozen=True)
 class RankedAlternative:
     candidate_id: str
     checkpoint_id: str
@@ -231,7 +248,7 @@ class RankedAlternativeController:
             termination_reason=None,
         )
         self._save(updated, event)
-        return RollbackDecision("continue_candidate", updated, selected, None)
+        return RollbackDecision("select_initial_candidate", updated, selected, None)
 
     def evaluate_rollback(
         self,
@@ -301,7 +318,9 @@ class RankedAlternativeController:
             termination_reason=None,
         )
         self._save(updated, event)
-        return RollbackDecision("continue_candidate", updated, selected, None)
+        return RollbackDecision(
+            "rollback_to_ranked_alternative", updated, selected, None
+        )
 
     def _save(
         self, state: BranchPointState, event: BranchControllerEvent
