@@ -13,7 +13,7 @@ from typing import Any
 
 from adaptive_swe_branching.config import config_sha256
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def stable_sha256(value: Any) -> str:

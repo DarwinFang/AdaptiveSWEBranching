@@ -1,10 +1,11 @@
 # Raw data schema
 
-Schema version `4` is intentionally event-oriented and label-agnostic. Version
+Schema version `5` is intentionally event-oriented and label-agnostic. Version
 3 introduced continuation retry provenance, explicit cap hits, multiple candidate
 sources for one deduplicated parent, and the separately scoped Child-q audit.
-Version 4 adds independent difficulty-screen records and append-only
-ranked-alternative rollback state.
+Version 4 added independent difficulty-screen records and append-only
+ranked-alternative rollback state. Version 5 adds the explicit post-branch
+`low_q_action` policy and renames its event threshold to `low_q_threshold`.
 
 ## Experiment manifest
 
@@ -101,10 +102,12 @@ Every accepted online branch group receives a deterministic ranking by
 `(-q, candidate_id)`. Append-only state snapshots preserve the original parent,
 stable child and checkpoint IDs, scores, full ranking, attempted IDs, current
 candidate, `N`, configurable maximum attempts `P`, exhaustion state, creation
-seed/config and revision. Matching events record initial selection, low-q
-rollback, candidate transition, non-rollback continuation and explicit
-`branch_candidates_exhausted` termination. A rollback restores the original
-parent before selecting an already-generated untried child; it never resamples.
+seed/config and revision. Matching events record initial selection, the
+configured low-q action, candidate transition, non-rollback continuation and
+explicit `branch_candidates_exhausted` termination. With the default
+`cold_continue`, a low-q event leaves the current candidate and attempted set
+unchanged. With `ranked_rollback`, the controller restores the original parent
+before selecting an already-generated untried child; it never resamples.
 
 ## Independent difficulty screening
 

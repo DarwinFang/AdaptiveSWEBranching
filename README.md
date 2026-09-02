@@ -15,18 +15,22 @@ permanent particle population. At a candidate executable checkpoint:
 4. the same model scores the resulting executable child states for **Judger B**;
 5. the search collapses to the chosen child and resumes as a single trajectory.
 
-If the selected suffix later falls below a configured rollback threshold, the
-controller restores the original branch-point checkpoint and then the
+If the selected suffix later falls below a configured threshold, the default
+`cold_continue` policy simply keeps following that child as the single chain:
+it spends no additional branching compute and performs no restore. An optional
+`ranked_rollback` policy instead restores the original branch point and then the
 highest-ranked previously generated child that has not been attempted. It does
 not sample a new child. After configurable `P <= N` attempts, another rollback
-terminates with `branch_candidates_exhausted`. The ranked list, attempts and
-every transition are persisted as append-only raw controller records.
+terminates with `branch_candidates_exhausted`. The selected policy, ranked list,
+attempts and every transition are persisted in the experiment records.
 
-This low-`q` rule applies **after branching**. It is separate from Judger A's
-parent-state rule: a low parent `q` has low `4q(1-q)` and does not trigger the
-ordinary uncertainty gate. The generated-child count `N`, attempted-child cap
-`P`, rollback threshold and `q` reassessment interval are independent,
-manifest-frozen online-policy hyperparameters.
+This switch applies **after branching**. It is separate from Judger A's
+parent-state rule: both low and high parent `q` have low `4q(1-q)` and therefore
+do not trigger the ordinary uncertainty gate. The low-`q` action, generated-child
+count `N`, attempted-child cap `P`, threshold and `q` reassessment interval are
+independent, manifest-frozen online-policy hyperparameters. The current default
+is `cold_continue`; `ranked_rollback` remains available for a controlled
+comparison selected on validation data.
 
 ```text
 single trajectory

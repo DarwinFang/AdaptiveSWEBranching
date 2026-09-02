@@ -57,10 +57,10 @@ def test_successive_low_q_rollbacks_choose_untried_ranked_candidates() -> None:
     restorer = RecordingRestorer()
     first = controller.start(new_state())
     second = controller.evaluate_rollback(
-        first.state, active_q=0.1, rollback_threshold=0.2, restorer=restorer
+        first.state, active_q=0.1, low_q_threshold=0.2, restorer=restorer
     )
     third = controller.evaluate_rollback(
-        second.state, active_q=0.1, rollback_threshold=0.2, restorer=restorer
+        second.state, active_q=0.1, low_q_threshold=0.2, restorer=restorer
     )
     assert second.selected is not None
     assert third.selected is not None
@@ -81,7 +81,7 @@ def test_rollback_restores_parent_then_selected_executable_child() -> None:
     restorer = RecordingRestorer()
     first = controller.start(new_state())
     controller.evaluate_rollback(
-        first.state, active_q=0.1, rollback_threshold=0.2, restorer=restorer
+        first.state, active_q=0.1, low_q_threshold=0.2, restorer=restorer
     )
     assert restorer.calls == [
         ("parent", "parent-checkpoint"),
@@ -94,10 +94,10 @@ def test_after_p_attempts_next_low_q_terminates_explicitly() -> None:
     restorer = RecordingRestorer()
     state = controller.start(new_state(max_attempts=2)).state
     state = controller.evaluate_rollback(
-        state, active_q=0.0, rollback_threshold=0.2, restorer=restorer
+        state, active_q=0.0, low_q_threshold=0.2, restorer=restorer
     ).state
     decision = controller.evaluate_rollback(
-        state, active_q=0.0, rollback_threshold=0.2, restorer=restorer
+        state, active_q=0.0, low_q_threshold=0.2, restorer=restorer
     )
     assert decision.action == "terminate"
     assert decision.termination_reason == "branch_candidates_exhausted"
@@ -111,14 +111,14 @@ def test_serialization_restart_preserves_attempted_candidates(tmp_path: Path) ->
     restorer = RecordingRestorer()
     state = controller.start(new_state()).state
     state = controller.evaluate_rollback(
-        state, active_q=0.0, rollback_threshold=0.2, restorer=restorer
+        state, active_q=0.0, low_q_threshold=0.2, restorer=restorer
     ).state
 
     restored = store.load("branch-1")
     assert restored == state
     assert restored.attempted_candidate_ids == ("candidate-a", "candidate-b")
     resumed = RankedAlternativeController(store=store).evaluate_rollback(
-        restored, active_q=0.0, rollback_threshold=0.2, restorer=restorer
+        restored, active_q=0.0, low_q_threshold=0.2, restorer=restorer
     )
     assert resumed.selected is not None
     assert resumed.selected.candidate_id == "candidate-c"
@@ -158,7 +158,9 @@ def active_checkpoint() -> CheckpointRecord:
     )
 
 
-def retry_scheduler(tmp_path: Path, *, q: float) -> SelectiveBranchingScheduler:
+def retry_scheduler(
+    tmp_path: Path, *, q: float, low_q_action: str = "cold_continue"
+) -> SelectiveBranchingScheduler:
     return SelectiveBranchingScheduler(
         proposer=None,  # type: ignore[arg-type]
         gate=None,  # type: ignore[arg-type]
@@ -166,18 +168,46 @@ def retry_scheduler(tmp_path: Path, *, q: float) -> SelectiveBranchingScheduler:
         ranker=None,  # type: ignore[arg-type]
         success_model=FixedActiveQ(q),
         retry_policy=RankedRetryPolicy(
-            rollback_q_threshold=0.2,
+            low_q_threshold=0.2,
             max_candidate_attempts_p=2,
             q_reassessment_interval_steps=3,
+            low_q_action=low_q_action,
         ),
         alternative_store=RankedAlternativeStore(tmp_path / "controller"),
     )
 
 
-def test_scheduler_waits_for_q_interval_then_rolls_back_and_exhausts(
+def test_scheduler_default_cold_policy_does_not_restore_or_consume_candidate(
     tmp_path: Path,
 ) -> None:
     scheduler = retry_scheduler(tmp_path, q=0.1)
+    restorer = RecordingRestorer()
+    state = scheduler.alternatives.start(new_state(max_attempts=2)).state
+
+    decision = scheduler.reassess_active_branch(
+        state=state,
+        active_checkpoint=active_checkpoint(),
+        steps_since_last_q_assessment=3,
+        restorer=restorer,
+    )
+
+    assert decision.action == "cold_continue_candidate"
+    assert decision.active_q == 0.1
+    assert decision.selected_alternative is None
+    assert decision.branch_point_state.attempted_candidate_ids == ("candidate-a",)
+    assert decision.branch_point_state.current_candidate_id == "candidate-a"
+    assert not decision.branch_point_state.exhausted
+    assert restorer.calls == []
+    assert [
+        event["action"]
+        for event in scheduler.alternatives.store.events("branch-1")
+    ] == ["select_initial_candidate", "cold_continue_active_candidate"]
+
+
+def test_scheduler_ranked_rollback_policy_waits_then_rolls_back_and_exhausts(
+    tmp_path: Path,
+) -> None:
+    scheduler = retry_scheduler(tmp_path, q=0.1, low_q_action="ranked_rollback")
     restorer = RecordingRestorer()
     state = scheduler.alternatives.start(new_state(max_attempts=2)).state
 
@@ -217,9 +247,16 @@ def test_scheduler_waits_for_q_interval_then_rolls_back_and_exhausts(
 
 
 def test_retry_policy_hyperparameters_are_validated() -> None:
-    with pytest.raises(ValueError, match="rollback_q_threshold"):
+    with pytest.raises(ValueError, match="low_q_threshold"):
         RankedRetryPolicy(
-            rollback_q_threshold=1.1,
+            low_q_threshold=1.1,
             max_candidate_attempts_p=2,
             q_reassessment_interval_steps=3,
+        )
+    with pytest.raises(ValueError, match="low_q_action"):
+        RankedRetryPolicy(
+            low_q_threshold=0.2,
+            max_candidate_attempts_p=2,
+            q_reassessment_interval_steps=3,
+            low_q_action="invent_new_policy",
         )

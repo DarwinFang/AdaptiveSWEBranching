@@ -7,22 +7,35 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
+LOW_Q_ACTIONS = ("cold_continue", "ranked_rollback")
+
 
 @dataclass(frozen=True)
 class RankedRetryPolicy:
-    """Frozen online policy after one temporary branch group is created."""
+    """Frozen online policy after one temporary branch group is created.
 
-    rollback_q_threshold: float
+    ``cold_continue`` is deliberately the default: a low-q active child keeps
+    running as the single chain. ``ranked_rollback`` enables the more active
+    alternative that restores the branch point and tries the next saved child.
+    """
+
+    low_q_threshold: float
     max_candidate_attempts_p: int
     q_reassessment_interval_steps: int
+    low_q_action: str = "cold_continue"
 
     def __post_init__(self) -> None:
-        if not 0.0 <= self.rollback_q_threshold <= 1.0:
-            raise ValueError("rollback_q_threshold must be in [0, 1]")
+        if not 0.0 <= self.low_q_threshold <= 1.0:
+            raise ValueError("low_q_threshold must be in [0, 1]")
         if self.max_candidate_attempts_p < 1:
             raise ValueError("max_candidate_attempts_p must be positive")
         if self.q_reassessment_interval_steps < 1:
             raise ValueError("q_reassessment_interval_steps must be positive")
+        if self.low_q_action not in LOW_Q_ACTIONS:
+            raise ValueError(
+                f"low_q_action must be one of {LOW_Q_ACTIONS}, "
+                f"got {self.low_q_action!r}"
+            )
 
 
 @dataclass(frozen=True)
@@ -166,7 +179,7 @@ class BranchControllerEvent:
     from_candidate_id: str | None
     to_candidate_id: str | None
     active_q: float | None
-    rollback_threshold: float | None
+    low_q_threshold: float | None
     termination_reason: str | None
 
     def to_dict(self) -> dict[str, Any]:
@@ -244,7 +257,7 @@ class RankedAlternativeController:
             from_candidate_id=None,
             to_candidate_id=selected.candidate_id,
             active_q=None,
-            rollback_threshold=None,
+            low_q_threshold=None,
             termination_reason=None,
         )
         self._save(updated, event)
@@ -255,15 +268,15 @@ class RankedAlternativeController:
         state: BranchPointState,
         *,
         active_q: float,
-        rollback_threshold: float,
+        low_q_threshold: float,
         restorer: AlternativeRestorer,
     ) -> RollbackDecision:
         if not 0.0 <= active_q <= 1.0:
             raise ValueError("active_q must be in [0, 1]")
-        if not 0.0 <= rollback_threshold <= 1.0:
-            raise ValueError("rollback_threshold must be in [0, 1]")
+        if not 0.0 <= low_q_threshold <= 1.0:
+            raise ValueError("low_q_threshold must be in [0, 1]")
         previous = state.current_candidate_id
-        if active_q >= rollback_threshold:
+        if active_q >= low_q_threshold:
             updated = state.advance_revision()
             event = BranchControllerEvent(
                 branch_point_id=updated.branch_point_id,
@@ -273,7 +286,7 @@ class RankedAlternativeController:
                 from_candidate_id=previous,
                 to_candidate_id=previous,
                 active_q=active_q,
-                rollback_threshold=rollback_threshold,
+                low_q_threshold=low_q_threshold,
                 termination_reason=None,
             )
             self._save(updated, event)
@@ -294,7 +307,7 @@ class RankedAlternativeController:
                 from_candidate_id=previous,
                 to_candidate_id=None,
                 active_q=active_q,
-                rollback_threshold=rollback_threshold,
+                low_q_threshold=low_q_threshold,
                 termination_reason=reason,
             )
             self._save(updated, event)
@@ -314,13 +327,42 @@ class RankedAlternativeController:
             from_candidate_id=previous,
             to_candidate_id=selected.candidate_id,
             active_q=active_q,
-            rollback_threshold=rollback_threshold,
+            low_q_threshold=low_q_threshold,
             termination_reason=None,
         )
         self._save(updated, event)
         return RollbackDecision(
             "rollback_to_ranked_alternative", updated, selected, None
         )
+
+    def record_cold_continue(
+        self,
+        state: BranchPointState,
+        *,
+        active_q: float,
+        low_q_threshold: float,
+    ) -> RollbackDecision:
+        """Record that low q was observed but rollback is disabled by policy."""
+
+        if not 0.0 <= active_q <= 1.0:
+            raise ValueError("active_q must be in [0, 1]")
+        if not 0.0 <= low_q_threshold <= 1.0:
+            raise ValueError("low_q_threshold must be in [0, 1]")
+        current = state.current_candidate_id
+        updated = state.advance_revision()
+        event = BranchControllerEvent(
+            branch_point_id=updated.branch_point_id,
+            revision=updated.revision,
+            action="cold_continue_active_candidate",
+            parent_checkpoint_id=updated.parent_checkpoint_id,
+            from_candidate_id=current,
+            to_candidate_id=current,
+            active_q=active_q,
+            low_q_threshold=low_q_threshold,
+            termination_reason=None,
+        )
+        self._save(updated, event)
+        return RollbackDecision("cold_continue_candidate", updated, None, None)
 
     def _save(
         self, state: BranchPointState, event: BranchControllerEvent

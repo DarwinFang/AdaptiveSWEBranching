@@ -92,9 +92,8 @@ class SelectiveBranchingScheduler:
                 "children_n": self.brancher.children,
                 "local_span_steps": self.brancher.local_span_steps,
                 "max_attempts_p": self.retry_policy.max_candidate_attempts_p,
-                "rollback_q_threshold": (
-                    self.retry_policy.rollback_q_threshold
-                ),
+                "low_q_action": self.retry_policy.low_q_action,
+                "low_q_threshold": self.retry_policy.low_q_threshold,
                 "q_reassessment_interval_steps": (
                     self.retry_policy.q_reassessment_interval_steps
                 ),
@@ -123,11 +122,13 @@ class SelectiveBranchingScheduler:
         steps_since_last_q_assessment: int,
         restorer: AlternativeRestorer,
     ) -> ActiveBranchDecision:
-        """Continue, roll back to the next saved child, or terminate.
+        """Continue, cold-handle low q, roll back, or terminate.
 
         The caller invokes this while following the currently selected child.
-        A rollback never samples a replacement: it restores the original branch
-        point and the highest-ranked child that has not already been attempted.
+        With the default ``cold_continue`` policy, low q leaves the active single
+        chain unchanged. With ``ranked_rollback``, a rollback never samples a
+        replacement: it restores the original branch point and the highest-ranked
+        child that has not already been attempted.
         """
 
         if steps_since_last_q_assessment < 0:
@@ -145,12 +146,22 @@ class SelectiveBranchingScheduler:
             )
 
         estimate = self.success_model.predict(active_checkpoint)
-        rollback = self.alternatives.evaluate_rollback(
-            state,
-            active_q=estimate.q,
-            rollback_threshold=self.retry_policy.rollback_q_threshold,
-            restorer=restorer,
-        )
+        if (
+            estimate.q < self.retry_policy.low_q_threshold
+            and self.retry_policy.low_q_action == "cold_continue"
+        ):
+            rollback = self.alternatives.record_cold_continue(
+                state,
+                active_q=estimate.q,
+                low_q_threshold=self.retry_policy.low_q_threshold,
+            )
+        else:
+            rollback = self.alternatives.evaluate_rollback(
+                state,
+                active_q=estimate.q,
+                low_q_threshold=self.retry_policy.low_q_threshold,
+                restorer=restorer,
+            )
         return ActiveBranchDecision(
             action=rollback.action,
             active_q=estimate.q,

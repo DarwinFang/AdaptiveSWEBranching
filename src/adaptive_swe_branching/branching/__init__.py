@@ -1,4 +1,5 @@
 from adaptive_swe_branching.branching.alternatives import (
+    LOW_Q_ACTIONS,
     BranchPointState,
     RankedAlternativeController,
     RankedAlternativeStore,
@@ -14,6 +15,7 @@ from adaptive_swe_branching.branching.success_probability import (
 )
 
 __all__ = [
+    "LOW_Q_ACTIONS",
     "ParentCandidate",
     "BranchPointState",
     "RankedAlternativeController",
