@@ -19,10 +19,11 @@ import shutil
 import statistics
 import subprocess
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 AXES = ("steps", "tokens", "wall_clock_seconds")
