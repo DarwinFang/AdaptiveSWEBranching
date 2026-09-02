@@ -1,0 +1,46 @@
+include:
+  - ../agent/qwen3_coder_30b_openhands.yaml
+  - ../benchmark/swesmith_py.yaml
+
+experiment:
+  name: difficulty_screen_v5_k5_20step
+  output_dir: /home/fangzhaohao/asb-runs/difficulty_screen_v5_k5_20step
+  root_seed: 20260901
+  purpose: difficulty_screen
+  immutable_manifest_required: true
+
+screening:
+  screen_version: difficulty_screen_v5_k5_20step
+  sampling: compatible_prior_tasks_first_then_fixed_seed_without_replacement
+  initial_counts_paths:
+    - configs/screening/legacy_source20_plus_v2_k5.json
+    - configs/screening/difficulty_screen_v4_completed_k5.json
+  # Four tasks run concurrently. Each has one active root attempt at a time,
+  # giving two independent requests to each GPU-backed Ollama service.
+  parallel_tasks: 4
+  parallel_runs_per_task: 1
+  agent_base_urls:
+    - http://127.0.0.1:11436
+    - http://127.0.0.1:11436
+    - http://127.0.0.1:11437
+    - http://127.0.0.1:11437
+  valid_runs_per_task: 5
+  early_stop_when_class_mathematically_resolved: true
+  maximum_total_attempts_per_task: 9
+  invalid_policy: retain_raw_retry_new_deterministic_seed
+  safety_cap_steps: 20
+  difficulty_classes:
+    screen_hard:
+      successes: [0, 1]
+    screen_medium:
+      successes: [2, 3]
+    screen_easy:
+      successes: [4, 5]
+  quotas:
+    screen_medium: 300
+    screen_easy: 100
+    screen_hard: 100
+  preserve_all_screened_tasks: true
+  reuse_for_vf_labels: false
+  reuse_for_counterfactual_continuations: false
+  reuse_for_online_evaluation: false

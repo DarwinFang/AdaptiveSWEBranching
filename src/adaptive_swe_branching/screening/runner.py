@@ -6,6 +6,7 @@ import json
 import random
 import shutil
 import subprocess
+import threading
 import time
 import traceback
 from collections import Counter, defaultdict
@@ -146,6 +147,29 @@ def safe_parallel_batch_size(
     )
 
 
+def worker_endpoint_groups(
+    endpoints: tuple[str, ...],
+    *,
+    parallel_tasks: int,
+    parallel_runs_per_task: int,
+) -> tuple[tuple[str, ...], ...]:
+    """Assign disjoint model-service slots to concurrently screened tasks."""
+    if parallel_tasks < 1 or parallel_runs_per_task < 1:
+        raise ValueError("parallel task and run counts must be positive")
+    required = parallel_tasks * parallel_runs_per_task
+    if required > len(endpoints):
+        raise ValueError(
+            "parallel_tasks * parallel_runs_per_task exceeds agent_base_urls"
+        )
+    return tuple(
+        endpoints[
+            task_index * parallel_runs_per_task :
+            (task_index + 1) * parallel_runs_per_task
+        ]
+        for task_index in range(parallel_tasks)
+    )
+
+
 class DifficultyScreeningRunner:
     """Independent task stratification under the configured frozen rule."""
 
@@ -183,11 +207,18 @@ class DifficultyScreeningRunner:
             self.agent_config["base_url"]
         ]
         self.agent_base_urls = tuple(str(value) for value in endpoints)
-        self.parallel_workers = int(
-            self.screen.get("parallel_root_runs", len(self.agent_base_urls))
+        self.parallel_tasks = int(self.screen.get("parallel_tasks", 1))
+        self.parallel_runs_per_task = int(
+            self.screen.get(
+                "parallel_runs_per_task",
+                self.screen.get("parallel_root_runs", len(self.agent_base_urls)),
+            )
         )
-        if not 1 <= self.parallel_workers <= len(self.agent_base_urls):
-            raise ValueError("parallel_root_runs must fit configured agent_base_urls")
+        self.endpoint_groups = worker_endpoint_groups(
+            self.agent_base_urls,
+            parallel_tasks=self.parallel_tasks,
+            parallel_runs_per_task=self.parallel_runs_per_task,
+        )
         self.dataset = SWESmithDataset(
             snapshot=Path(self.benchmark["dataset_path"]),
             revision=self.benchmark["version"],
@@ -201,7 +232,8 @@ class DifficultyScreeningRunner:
             timeout_seconds=float(self.benchmark["verifier_timeout_seconds"]),
             store=self.raw,
         )
-        self.current_task: str | None = None
+        self.current_tasks: set[str] = set()
+        self.progress_lock = threading.Lock()
         self.started = time.monotonic()
 
     def run(self) -> dict[str, Any]:
@@ -216,7 +248,13 @@ class DifficultyScreeningRunner:
             summaries = self._load_records("screening_tasks")
             runs = self._load_records("screening_runs")
             self._write_progress(summaries, runs)
-            for item in plan["ordered_tasks"]:
+            completed_task_ids = {summary["task_id"] for summary in summaries}
+            remaining_items = [
+                item
+                for item in plan["ordered_tasks"]
+                if item["task_id"] not in completed_task_ids
+            ]
+            while remaining_items:
                 counts = Counter(
                     summary["difficulty_class"]
                     for summary in summaries
@@ -224,44 +262,63 @@ class DifficultyScreeningRunner:
                 )
                 if quotas_satisfied(counts, self.quotas):
                     break
-                task_id = item["task_id"]
-                if any(summary["task_id"] == task_id for summary in summaries):
-                    continue
-                self.current_task = task_id
-                self._write_progress(summaries, runs)
-                summary, new_runs = self._screen_task(
-                    task_id=task_id,
-                    repository=item["repository"],
-                    sample_index=int(item["sample_index"]),
-                    prior_runs=[run for run in runs if run["task_id"] == task_id],
-                    imported_successes=int(item.get("imported_successes", 0)),
-                    imported_valid_runs=int(item.get("imported_valid_runs", 0)),
-                    evidence_source=str(item.get("evidence_source", "fresh")),
-                )
-                summaries.append(summary.to_dict())
-                runs.extend(run.to_dict() for run in new_runs)
-                self.raw.put("screening_task", task_id, summary)
-                self.current_task = None
-                self._write_progress(summaries, runs)
-                self._write_screening_results(summaries)
-                counts = Counter(
-                    record["difficulty_class"]
-                    for record in summaries
-                    if record["difficulty_class"] != SCREEN_INVALID
-                )
-                print(
-                    json.dumps(
-                        {
-                            "completed_task": task_id,
-                            "result": summary.difficulty_class,
-                            "successes": summary.n_success,
-                            "valid": summary.n_valid,
-                            "counts": dict(counts),
-                        },
-                        sort_keys=True,
-                    ),
-                    flush=True,
-                )
+                batch = remaining_items[: self.parallel_tasks]
+                del remaining_items[: len(batch)]
+                self.current_tasks = {str(item["task_id"]) for item in batch}
+                self._write_progress_locked(summaries, runs)
+                with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+                    futures = {
+                        executor.submit(
+                            self._screen_task,
+                            task_id=str(item["task_id"]),
+                            repository=str(item["repository"]),
+                            sample_index=int(item["sample_index"]),
+                            prior_runs=[
+                                run
+                                for run in runs
+                                if run["task_id"] == item["task_id"]
+                            ],
+                            imported_successes=int(
+                                item.get("imported_successes", 0)
+                            ),
+                            imported_valid_runs=int(
+                                item.get("imported_valid_runs", 0)
+                            ),
+                            evidence_source=str(
+                                item.get("evidence_source", "fresh")
+                            ),
+                            agent_base_urls=self.endpoint_groups[worker_index],
+                        ): item
+                        for worker_index, item in enumerate(batch)
+                    }
+                    for future in as_completed(futures):
+                        item = futures[future]
+                        task_id = str(item["task_id"])
+                        summary, new_runs = future.result()
+                        summaries.append(summary.to_dict())
+                        runs.extend(run.to_dict() for run in new_runs)
+                        self.raw.put("screening_task", task_id, summary)
+                        self.current_tasks.discard(task_id)
+                        self._write_progress_locked(summaries, runs)
+                        self._write_screening_results(summaries)
+                        counts = Counter(
+                            record["difficulty_class"]
+                            for record in summaries
+                            if record["difficulty_class"] != SCREEN_INVALID
+                        )
+                        print(
+                            json.dumps(
+                                {
+                                    "completed_task": task_id,
+                                    "result": summary.difficulty_class,
+                                    "successes": summary.n_success,
+                                    "valid": summary.n_valid,
+                                    "counts": dict(counts),
+                                },
+                                sort_keys=True,
+                            ),
+                            flush=True,
+                        )
             counts = Counter(
                 item["difficulty_class"]
                 for item in summaries
@@ -279,16 +336,33 @@ class DifficultyScreeningRunner:
             return self._progress_payload(summaries, runs, complete=True)
 
     def _load_imported_counts(self) -> dict[str, dict[str, Any]]:
-        path_value = self.screen.get("initial_counts_path")
-        if not path_value:
+        path_values = self.screen.get("initial_counts_paths")
+        legacy_path = self.screen.get("initial_counts_path")
+        if path_values is not None and legacy_path is not None:
+            raise ValueError(
+                "configure initial_counts_path or initial_counts_paths, not both"
+            )
+        if path_values is None:
+            path_values = [legacy_path] if legacy_path else []
+        if not path_values:
             return {}
-        payload = json.loads(Path(path_value).expanduser().read_text(encoding="utf-8"))
         expected_definition = "ordinary root Agent outcome within at most 20 steps"
-        if payload.get("definition") != expected_definition:
-            raise ValueError("imported screening counts use a different definition")
-        imported = {row["task_id"]: row for row in payload["tasks"]}
-        if len(imported) != len(payload["tasks"]):
-            raise ValueError("imported screening task IDs are not unique")
+        imported: dict[str, dict[str, Any]] = {}
+        for path_value in path_values:
+            payload = json.loads(
+                Path(path_value).expanduser().read_text(encoding="utf-8")
+            )
+            if payload.get("definition") != expected_definition:
+                raise ValueError(
+                    "imported screening counts use a different definition"
+                )
+            rows = payload["tasks"]
+            task_ids = [row["task_id"] for row in rows]
+            if len(task_ids) != len(set(task_ids)):
+                raise ValueError("one imported screening source repeats task IDs")
+            # Later sources are explicit refinements of earlier counts. They
+            # replace, rather than add to, the complete k/m for the same task.
+            imported.update({row["task_id"]: row for row in rows})
         return imported
 
     def _initialise_manifest(self) -> None:
@@ -368,6 +442,7 @@ class DifficultyScreeningRunner:
         imported_successes: int,
         imported_valid_runs: int,
         evidence_source: str,
+        agent_base_urls: tuple[str, ...],
     ) -> tuple[ScreeningTaskRecord, list[ScreeningRunRecord]]:
         try:
             task = self.cache.resolve(self.dataset.load(task_id))
@@ -416,7 +491,7 @@ class DifficultyScreeningRunner:
                 successes=successes,
                 observed_valid_runs=imported_valid_runs + len(valid),
                 target_valid_runs=self.target_valid,
-                maximum_workers=self.parallel_workers,
+                maximum_workers=len(agent_base_urls),
             )
             attempts = []
             while len(attempts) < batch_size and next_attempt < self.maximum_attempts:
@@ -430,17 +505,15 @@ class DifficultyScreeningRunner:
                         task=task,
                         sample_index=sample_index,
                         attempt_index=attempt_index,
-                        agent_base_url=self.agent_base_urls[
-                            attempt_index % len(self.agent_base_urls)
-                        ],
+                        agent_base_url=agent_base_urls[worker_index],
                     ): attempt_index
-                    for attempt_index in attempts
+                    for worker_index, attempt_index in enumerate(attempts)
                 }
                 for future in as_completed(futures):
                     record = future.result()
                     accumulated.append(record.to_dict())
                     new_records.append(record)
-                    self._write_progress(
+                    self._write_progress_locked(
                         self._load_records("screening_tasks"),
                         self._load_records("screening_runs"),
                     )
@@ -707,6 +780,16 @@ class DifficultyScreeningRunner:
             payload["repository_distribution"],
         )
 
+    def _write_progress_locked(
+        self,
+        summaries: list[dict[str, Any]],
+        runs: list[dict[str, Any]],
+        *,
+        complete: bool = False,
+    ) -> None:
+        with self.progress_lock:
+            self._write_progress(summaries, runs, complete=complete)
+
     def _write_screening_results(self, summaries: list[dict[str, Any]]) -> None:
         path = self.output / "screening_results.csv"
         temporary = path.with_suffix(".csv.tmp")
@@ -750,7 +833,7 @@ class DifficultyScreeningRunner:
             "complete": complete,
             "total_tasks_screened": len(summaries),
             "currently_running_tasks": (
-                [self.current_task] if self.current_task is not None else []
+                sorted(self.current_tasks)
             ),
             "counts": {
                 name: {"current": counts[name], "target": target}

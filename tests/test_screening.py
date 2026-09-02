@@ -14,6 +14,7 @@ from adaptive_swe_branching.screening.runner import (
     resolved_difficulty_class,
     safe_parallel_batch_size,
     selected_cohort,
+    worker_endpoint_groups,
 )
 
 
@@ -98,6 +99,20 @@ def test_parallel_batches_never_launch_past_first_possible_decision(
         target_valid_runs=target,
         maximum_workers=workers,
     ) == expected
+
+
+def test_four_task_workers_map_two_slots_to_each_gpu_service() -> None:
+    endpoints = ("gpu0", "gpu0", "gpu1", "gpu1")
+    assert worker_endpoint_groups(
+        endpoints, parallel_tasks=4, parallel_runs_per_task=1
+    ) == (("gpu0",), ("gpu0",), ("gpu1",), ("gpu1",))
+
+
+def test_endpoint_groups_reject_oversubscription() -> None:
+    with pytest.raises(ValueError, match="exceeds"):
+        worker_endpoint_groups(
+            ("gpu0", "gpu1"), parallel_tasks=2, parallel_runs_per_task=2
+        )
 
 
 def test_all_three_quotas_must_be_reached() -> None:
