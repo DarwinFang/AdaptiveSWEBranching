@@ -73,3 +73,16 @@ def test_child_q_audit_is_separate_and_bounded() -> None:
         "sampling": "fixed_seed_without_replacement",
     }
     assert config["child_q_rollout"]["target_valid_continuations_per_child"] == 8
+
+
+def test_screening_v6_freezes_work_conserving_four_slot_schedule() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config = load_config(
+        project_root / "configs/experiments/difficulty_screen_v6_k5_20step.yaml"
+    )
+    screen = config["screening"]
+    assert screen["scheduling"] == "rolling_work_conserving_task_pool"
+    assert screen["parallel_tasks"] == 4
+    assert screen["parallel_runs_per_task"] == 1
+    assert screen["agent_base_urls"].count("http://127.0.0.1:11436") == 2
+    assert screen["agent_base_urls"].count("http://127.0.0.1:11437") == 2

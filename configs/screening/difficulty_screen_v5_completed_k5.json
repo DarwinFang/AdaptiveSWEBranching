@@ -1,0 +1,94 @@
+{
+  "definition": "ordinary root Agent outcome within at most 20 steps",
+  "purpose": "screening_seed_only_not_training_or_evaluation",
+  "schema_version": 1,
+  "source_run_root": "/home/fangzhaohao/asb-runs/difficulty_screen_v5_k5_20step",
+  "source_git_commit": "a670a20411018e5d45de92ced0035f2c75e01c9a",
+  "target_valid_runs": 5,
+  "tasks": [
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 1,
+      "task_id": "PyCQA__flake8.cf1542ce.func_basic__uxkmhh8a",
+      "valid_runs": 5
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 1,
+      "task_id": "adrienverge__yamllint.8513d9b9.func_pm_op_swap__bvcpzzfd",
+      "valid_runs": 5
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 2,
+      "task_id": "aio-libs__async-timeout.d0baa9f1.lm_rewrite__kqd6t1mb",
+      "valid_runs": 4
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 3,
+      "task_id": "alanjds__drf-nested-routers.6144169d.func_basic__c6wzdae3",
+      "valid_runs": 5
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 2,
+      "task_id": "andialbrecht__sqlparse.e57923b3.func_basic__dmfqd8zr",
+      "valid_runs": 4
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 2,
+      "task_id": "arrow-py__arrow.1d70d009.func_basic__w1skinei",
+      "valid_runs": 5
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 2,
+      "task_id": "bottlepy__bottle.a8dfef30.func_basic__9dja9e7b",
+      "valid_runs": 4
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 4,
+      "task_id": "cool-RR__PySnooper.57472b46.lm_rewrite__xxcs25kj",
+      "valid_runs": 5
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 2,
+      "task_id": "dask__dask.5f61e423.pr_10500",
+      "valid_runs": 4
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 2,
+      "task_id": "django-money__django-money.835c1ab8.combine_file__yw0532zq",
+      "valid_runs": 5
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 3,
+      "task_id": "getmoto__moto.694ce1f4.func_pm_op_change_const__wqulq5xs",
+      "valid_runs": 5
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 2,
+      "task_id": "gweis__isodate.17cb25eb.combine_file__4u5mlu9j",
+      "valid_runs": 4
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 1,
+      "task_id": "keleshev__schema.24a30457.func_basic__lgfgdj4p",
+      "valid_runs": 5
+    },
+    {
+      "source": "difficulty_screen_v5_k5_20step",
+      "successes": 2,
+      "task_id": "mahmoud__boltons.3bfcfdd0.combine_file__eml7ze28",
+      "valid_runs": 4
+    }
+  ]
+}

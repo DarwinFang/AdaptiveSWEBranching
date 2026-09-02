@@ -9,8 +9,14 @@ import subprocess
 import threading
 import time
 import traceback
-from collections import Counter, defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import Counter, defaultdict, deque
+from concurrent.futures import (
+    FIRST_COMPLETED,
+    Future,
+    ThreadPoolExecutor,
+    as_completed,
+    wait,
+)
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -247,49 +253,49 @@ class DifficultyScreeningRunner:
             runs = self._load_records("screening_runs")
             self._write_progress(summaries, runs)
             completed_task_ids = {summary["task_id"] for summary in summaries}
-            remaining_items = [
+            remaining_items = deque(
                 item
                 for item in plan["ordered_tasks"]
                 if item["task_id"] not in completed_task_ids
-            ]
-            while remaining_items:
-                counts = Counter(
-                    summary["difficulty_class"]
-                    for summary in summaries
-                    if summary["difficulty_class"] != SCREEN_INVALID
+            )
+            in_flight: dict[Future[Any], tuple[dict[str, Any], int]] = {}
+
+            def submit_next(executor: ThreadPoolExecutor, worker_index: int) -> None:
+                item = remaining_items.popleft()
+                task_id = str(item["task_id"])
+                self.current_tasks.add(task_id)
+                future = executor.submit(
+                    self._screen_task,
+                    task_id=task_id,
+                    repository=str(item["repository"]),
+                    sample_index=int(item["sample_index"]),
+                    prior_runs=[run for run in runs if run["task_id"] == task_id],
+                    imported_successes=int(item.get("imported_successes", 0)),
+                    imported_valid_runs=int(item.get("imported_valid_runs", 0)),
+                    evidence_source=str(item.get("evidence_source", "fresh")),
+                    agent_base_urls=self.endpoint_groups[worker_index],
                 )
-                if quotas_satisfied(counts, self.quotas):
-                    break
-                batch = remaining_items[: self.parallel_tasks]
-                del remaining_items[: len(batch)]
-                self.current_tasks = {str(item["task_id"]) for item in batch}
+                in_flight[future] = (item, worker_index)
+
+            with ThreadPoolExecutor(max_workers=self.parallel_tasks) as executor:
+                for worker_index in range(
+                    min(self.parallel_tasks, len(remaining_items))
+                ):
+                    submit_next(executor, worker_index)
                 self._write_progress_locked(summaries, runs)
-                with ThreadPoolExecutor(max_workers=len(batch)) as executor:
-                    futures = {
-                        executor.submit(
-                            self._screen_task,
-                            task_id=str(item["task_id"]),
-                            repository=str(item["repository"]),
-                            sample_index=int(item["sample_index"]),
-                            prior_runs=[
-                                run for run in runs if run["task_id"] == item["task_id"]
-                            ],
-                            imported_successes=int(item.get("imported_successes", 0)),
-                            imported_valid_runs=int(item.get("imported_valid_runs", 0)),
-                            evidence_source=str(item.get("evidence_source", "fresh")),
-                            agent_base_urls=self.endpoint_groups[worker_index],
-                        ): item
-                        for worker_index, item in enumerate(batch)
-                    }
-                    for future in as_completed(futures):
-                        item = futures[future]
+
+                while in_flight:
+                    completed, _ = wait(
+                        tuple(in_flight), return_when=FIRST_COMPLETED
+                    )
+                    for future in completed:
+                        item, worker_index = in_flight.pop(future)
                         task_id = str(item["task_id"])
                         summary, new_runs = future.result()
                         summaries.append(summary.to_dict())
                         runs.extend(run.to_dict() for run in new_runs)
                         self.raw.put("screening_task", task_id, summary)
                         self.current_tasks.discard(task_id)
-                        self._write_progress_locked(summaries, runs)
                         self._write_screening_results(summaries)
                         counts = Counter(
                             record["difficulty_class"]
@@ -309,6 +315,12 @@ class DifficultyScreeningRunner:
                             ),
                             flush=True,
                         )
+                        if (
+                            remaining_items
+                            and not quotas_satisfied(counts, self.quotas)
+                        ):
+                            submit_next(executor, worker_index)
+                        self._write_progress_locked(summaries, runs)
             counts = Counter(
                 item["difficulty_class"]
                 for item in summaries

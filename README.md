@@ -110,6 +110,11 @@ outcomes when available; new clean runs complete the classification. This
 screening-only `q20` must not be confused with the 60-step state value used by
 later continuation experiments.
 
+Screening uses a rolling four-task worker pool. The four model-service slots
+map to two concurrent requests on each GPU. When one task finishes, its slot is
+immediately assigned the next task instead of waiting for the slowest member of
+a fixed batch.
+
 Compute accounting for all strategy simulations is defined in
 [`docs/MATCHED_COMPUTE.md`](docs/MATCHED_COMPUTE.md).
 
