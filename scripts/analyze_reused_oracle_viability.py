@@ -103,6 +103,8 @@ def read_screen(path: Path) -> dict[str, dict[str, Any]]:
     with path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             k, m = int(row["k"]), int(row["m"])
+            if m == 0:
+                continue
             rows[row["task_id"]] = {
                 "k": k,
                 "m": m,
