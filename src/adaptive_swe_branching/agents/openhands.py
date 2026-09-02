@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import importlib.metadata
 import inspect
 import pickle
 import re
@@ -19,6 +20,10 @@ from adaptive_swe_branching.environments.container import DockerContainer
 STATE_FILE = "openhands_state.pkl"
 STATE_FORMAT = "openhands-sdk-pickle-v1"
 WORKSPACE_TOKEN = "<ASB_WORKSPACE>"
+DEFAULT_OBJECTIVE = (
+    "Find the root cause, fix it, run relevant tests, and finish with a short "
+    "summary."
+)
 
 
 class OpenHandsSession:
@@ -96,11 +101,13 @@ class OpenHandsSession:
         return stable_sha256(
             {
                 "scaffold": "openhands",
+                "scaffold_version": importlib.metadata.version("openhands-sdk"),
                 "model": self.model,
                 "settings": {
                     k: v for k, v in self.llm_settings.items() if k != "api_key"
                 },
                 "tools": self.tools,
+                "objective": DEFAULT_OBJECTIVE,
                 "step_semantics": "one model response plus tool observation",
             }
         )
@@ -151,14 +158,18 @@ class OpenHandsSession:
         self._final_answer = None
         self._termination_reason = None
         self._explored_files = set()
+        from adaptive_swe_branching.agents.openhands_tools import (
+            validate_terminal_transport,
+        )
+
+        validate_terminal_transport(container)
         CONTAINERS.register(container)
         try:
             self._build()
             self._conversation.send_message(
                 f"## Task\n{task.issue}\n\n"
                 f"The repository is at `{container.container_root}`. Terminal and file "
-                "editor use that same path namespace. Find the root cause, fix it, run "
-                "relevant tests, and finish with a short summary."
+                f"editor use that same path namespace. {DEFAULT_OBJECTIVE}"
             )
         except Exception:
             self.close()
@@ -170,6 +181,11 @@ class OpenHandsSession:
         self.close()
         self.task = task
         self.container = container
+        from adaptive_swe_branching.agents.openhands_tools import (
+            validate_terminal_transport,
+        )
+
+        validate_terminal_transport(container)
         CONTAINERS.register(container)
 
     def _pause_after_observation(self, event: Any) -> None:
@@ -418,8 +434,18 @@ def _assistant_text(events: list[dict[str, Any]]) -> str | None:
         message = event.get("llm_message") or {}
         if message.get("role") == "assistant" and not message.get("tool_calls"):
             content = message.get("content", "")
-            if isinstance(content, str) and content.strip():
-                return content.strip()
+            if isinstance(content, str):
+                text = content
+            elif isinstance(content, list):
+                text = "\n".join(
+                    str(item.get("text", ""))
+                    for item in content
+                    if isinstance(item, dict)
+                )
+            else:
+                text = ""
+            if text.strip():
+                return text.strip()
     return None
 
 
@@ -455,6 +481,12 @@ def _observation_text(observation: dict[str, Any] | None) -> str:
                     str(item.get("text", item)) if isinstance(item, dict) else str(item)
                     for item in value
                 )
+        metadata = payload.get("metadata")
+        if isinstance(metadata, dict):
+            for key in ("prefix", "suffix"):
+                value = metadata.get(key)
+                if isinstance(value, str) and value.strip():
+                    pieces.append(value)
     return "\n".join(pieces)[:16000]
 
 

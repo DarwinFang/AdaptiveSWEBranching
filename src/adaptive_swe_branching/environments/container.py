@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import uuid
 from dataclasses import dataclass
@@ -66,6 +67,7 @@ class DockerContainer:
         self.container_root = container_root
         self.platform = platform
         self.name = f"asb-{uuid.uuid4().hex[:12]}"
+        self._shim_path = self.workspace.parent / f".{self.name}-shell"
         self.started = False
 
     def start(self) -> None:
@@ -81,6 +83,8 @@ class DockerContainer:
                 self.name,
                 "--platform",
                 self.platform,
+                "--user",
+                "root",
                 "-v",
                 f"{self.workspace}:{self.container_root}",
                 "-w",
@@ -94,6 +98,10 @@ class DockerContainer:
             text=True,
         )
         self.started = True
+        self.exec(
+            "git config --global --add safe.directory "
+            + shlex.quote(self.container_root)
+        )
 
     def exec(
         self, command: str, *, timeout: float | None = None
@@ -114,13 +122,28 @@ class DockerContainer:
         )
 
     def shell_shim(self) -> Path:
-        path = self.workspace.parent / f".{self.name}-shell"
-        path.write_text(
-            f'#!/bin/sh\nexec docker exec {shlex.quote(self.name)} bash "$@"\n',
+        docker = shutil.which("docker")
+        if docker is None:
+            raise RuntimeError("docker executable not found")
+        argv = (
+            docker,
+            "exec",
+            "-i",
+            "-w",
+            self.container_root,
+            "-u",
+            "root",
+            self.name,
+            "/bin/bash",
+        )
+        self._shim_path.write_text(
+            "#!/bin/sh\nexec "
+            + " ".join(shlex.quote(value) for value in argv)
+            + ' "$@"\n',
             encoding="utf-8",
         )
-        path.chmod(0o700)
-        return path
+        self._shim_path.chmod(0o700)
+        return self._shim_path
 
     def stop(self) -> None:
         if not self.started:
@@ -144,7 +167,7 @@ class DockerContainer:
             text=True,
         )
         self.started = False
-        self.shell_shim().unlink(missing_ok=True)
+        self._shim_path.unlink(missing_ok=True)
 
     def __enter__(self) -> DockerContainer:
         self.start()

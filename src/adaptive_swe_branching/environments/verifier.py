@@ -58,6 +58,22 @@ class SWESmithVerifier:
             except FileNotFoundError:
                 pass
 
+        if not patch.strip():
+            record = VerifierRecord(
+                verifier_record_id=record_id,
+                task_id=task.record.task_id,
+                patch_sha256=patch_hash,
+                outcome=Outcome.UNSOLVED,
+                regression_passed=None,
+                report_ref=None,
+                cost=Cost(),
+                invalid_reason=None,
+                details={"reason": "empty_patch", "harness_invoked": False},
+            )
+            if self.store is not None:
+                self.store.put("verifier", record_id, record)
+            return Verification(record=record, report=record.details)
+
         started = time.monotonic()
         report: dict[str, Any] = {}
         invalid: str | None = None

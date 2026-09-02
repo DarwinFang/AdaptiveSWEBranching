@@ -13,6 +13,8 @@ from adaptive_swe_branching.environments.container import PathMap
 
 _REGISTERED = False
 _LOCK = threading.Lock()
+_TRANSPORT_VALIDATED = False
+_TRANSPORT_LOCK = threading.Lock()
 
 
 def register_tools() -> None:
@@ -40,6 +42,48 @@ def tool_names(configured: list[str] | tuple[str, ...]) -> tuple[str, ...]:
         raise ValueError(
             f"tool has no container-routed implementation: {error.args[0]}"
         ) from None
+
+
+def validate_terminal_transport(container) -> None:
+    """Fail once, before rollout, if OpenHands cannot drive the container shell."""
+    global _TRANSPORT_VALIDATED
+    with _TRANSPORT_LOCK:
+        if _TRANSPORT_VALIDATED:
+            return
+        from openhands.tools.terminal.definition import TerminalAction
+        from openhands.tools.terminal.impl import TerminalExecutor
+
+        executor = TerminalExecutor(
+            working_dir=str(container.workspace),
+            no_change_timeout_seconds=10,
+            terminal_type="subprocess",
+            shell_path=str(container.shell_shim()),
+        )
+        try:
+            checks = (
+                ("pwd; printf '__ASB_TERMINAL_1__\\n'", container.container_root),
+                ("printf '__ASB_TERMINAL_2__\\n'", "__ASB_TERMINAL_2__"),
+            )
+            for command, expected in checks:
+                observation = executor(TerminalAction(command=command, timeout=20))
+                text = "\n".join(
+                    str(getattr(item, "text", ""))
+                    for item in (getattr(observation, "content", None) or ())
+                )
+                if observation.is_error or observation.exit_code != 0:
+                    raise RuntimeError(
+                        "OpenHands container terminal preflight failed: "
+                        f"command={command!r}, exit={observation.exit_code}, "
+                        f"output={text[-1000:]!r}"
+                    )
+                if expected not in text:
+                    raise RuntimeError(
+                        "OpenHands container terminal preflight returned the wrong "
+                        f"output for {command!r}: {text[-1000:]!r}"
+                    )
+        finally:
+            executor.close()
+        _TRANSPORT_VALIDATED = True
 
 
 # These imports remain at module scope because OpenHands state is pickled by
